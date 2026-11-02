@@ -3,7 +3,7 @@
 Three personas encode documented real-world vendor behaviours:
   standard : capabilities open, device info behind auth, Media (ver10),
              stream URI *with embedded credentials* (redaction test),
-             PTZ present, clock accurate.
+             PTZ present, clock accurate, dual-stack discovery XAddrs.
   legacy   : minimal discovery Scopes, device info WITHOUT auth (loose
              legacy firmware), single profile, no PTZ.
   strict   : even GetCapabilities needs auth, clock skewed +3723 s
@@ -32,7 +32,7 @@ PERSONAS = {
         port=18081, disc_port=37021, manufacturer="Acme (sim)", model="ViewCam AC-200",
         firmware="1.4.2 (sim)", serial="SIMSTD0001", hardware="AC-200",
         clock_offset_s=2, auth_devinfo=True, auth_caps=False, ptz=True, media2=False,
-        stream_uri_with_creds=True,
+        stream_uri_with_creds=True, dual_stack=True,
         scopes="onvif://www.onvif.org/Profile/Streaming onvif://www.onvif.org/Profile/T "
                "onvif://www.onvif.org/name/Sim%20Standard onvif://www.onvif.org/hardware/AC-200 "
                "onvif://www.onvif.org/mac/aa:bb:cc:00:00:01 onvif://www.onvif.org/location/lab",
@@ -236,7 +236,7 @@ PROBE_MATCH = """<?xml version="1.0" encoding="UTF-8"?>
   <wsa:EndpointReference><wsa:Address>urn:uuid:{urn}</wsa:Address></wsa:EndpointReference>
   <d:Types>dn:NetworkVideoTransmitter tds:Device</d:Types>
   <d:Scopes>{scopes}</d:Scopes>
-  <d:XAddrs>http://127.0.0.1:{port}/onvif/device_service</d:XAddrs>
+  <d:XAddrs>{xaddrs}</d:XAddrs>
   <d:MetadataVersion>1</d:MetadataVersion>
  </d:ProbeMatch></d:ProbeMatches></s:Body></s:Envelope>"""
 
@@ -245,6 +245,9 @@ def _discovery_loop(p, urn):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind(("", p["disc_port"]))
+    xaddrs = ["http://127.0.0.1:%d/onvif/device_service" % p["port"]]
+    if p.get("dual_stack"):
+        xaddrs.insert(0, "http://[2001:db8::1]:%d/onvif/device_service" % p["port"])
     while True:
         data, addr = sock.recvfrom(8192)
         if b"Probe" not in data:
@@ -259,7 +262,7 @@ def _discovery_loop(p, urn):
             pass
         time.sleep(0.02)
         sock.sendto(PROBE_MATCH.format(relates=relates, urn=urn, scopes=p["scopes"],
-                                       port=p["port"]).encode(), addr)
+                                       xaddrs=" ".join(xaddrs)).encode(), addr)
 
 
 class SimDevices:

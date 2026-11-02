@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+ xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing"
+ xmlns:d="http://schemas.xmlsoap.org/ws/2005/04/discovery">
+ <s:Body><d:ProbeMatches><d:ProbeMatch>
+  <wsa:EndpointReference><wsa:Address>urn:uuid:dual-stack-camera</wsa:Address></wsa:EndpointReference>
+  <d:Types>dn:NetworkVideoTransmitter</d:Types>
+  <d:Scopes>onvif://www.onvif.org/name/Dual%20Stack%20Camera</d:Scopes>
+  <d:XAddrs>http://[2001:db8::10]:80/onvif/device_service http://192.0.2.10/onvif/device_service</d:XAddrs>
+  <d:MetadataVersion>1</d:MetadataVersion>
+ </d:ProbeMatch></d:ProbeMatches></s:Body>
+</s:Envelope>

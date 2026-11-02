@@ -47,11 +47,22 @@ class TestSimE2E(unittest.TestCase):
         return scan_device(entry, lambda ip, ep, mac: CRED, timeout=3.0)
 
     def test_all_discovered(self):
-        self.assertEqual(len(self.by_port), 3)
+        expected = {
+            "http://127.0.0.1:%d/onvif/device_service" % PERSONAS[name]["port"]
+            for name in PERSONAS
+        }
+        self.assertTrue(expected.issubset(self.by_port))
+        self.assertEqual(
+            len(PERSONAS),
+            len({self.by_port[xaddr]["endpoint"] for xaddr in expected}),
+        )
 
     def test_standard_full_with_redacted_stream_uri(self):
         rec = self._scan("standard")
         self.assertEqual(rec["level"], "FULL")
+        self.assertEqual(rec["ip"], "127.0.0.1", "IPv4 XAddr is preferred for inventory")
+        self.assertIn("http://[2001:db8::1]:18081/onvif/device_service", rec["xaddrs"])
+        self.assertIn("http://127.0.0.1:18081/onvif/device_service", rec["xaddrs"])
         self.assertEqual(rec["device_info"]["Model"], "ViewCam AC-200")
         self.assertTrue(rec["ptz"]["present"])
         self.assertEqual(rec["channel_count"], 1)
