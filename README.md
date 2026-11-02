@@ -86,6 +86,10 @@ PYTHONPATH=src python3 -m onvifscan scan --creds creds.json
 
 # multicast filtered / camera on another VLAN segment you manage
 PYTHONPATH=src python3 -m onvifscan scan --host 192.168.3.64
+
+# many directed targets: one host[:discovery-port] per line in a text
+# file (# comments and blank lines ignored; combines with --host)
+PYTHONPATH=src python3 -m onvifscan scan --hosts cameras.txt
 ```
 
 Outputs `onvif-inventory.json` and `onvif-inventory.html` in the current

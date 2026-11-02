@@ -66,6 +66,10 @@ PYTHONPATH=src python3 -m onvifscan scan --creds creds.json
 
 # 组播被过滤 / 已知地址定向
 PYTHONPATH=src python3 -m onvifscan scan --host 192.168.3.64
+
+# 定向目标很多时：文本文件一行一个 host[:发现端口]（# 注释与空行
+# 忽略；可与 --host 混用）
+PYTHONPATH=src python3 -m onvifscan scan --hosts cameras.txt
 ```
 
 报告默认写到当前目录 `onvif-inventory.json` / `onvif-inventory.html`。
