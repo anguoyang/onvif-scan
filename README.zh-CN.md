@@ -71,6 +71,13 @@ PYTHONPATH=src python3 -m onvifscan scan --host 192.168.3.64
 报告默认写到当前目录 `onvif-inventory.json` / `onvif-inventory.html`。
 `examples/` 里有对着模拟设备生成的样例报告（明确标注 simulated）。
 
+用于 cron 定时盘点时，可加 `--quiet`，终端只输出汇总行和报告路径；
+JSON 与 HTML 报告仍按原方式生成：
+
+```sh
+PYTHONPATH=src python3 -m onvifscan scan --quiet
+```
+
 ## 结果怎么读
 
 逐台定级：**FULL**（身份+Profile 齐全）、**PARTIAL**（只有身份或能力）、

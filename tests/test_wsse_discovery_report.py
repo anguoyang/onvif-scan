@@ -4,6 +4,7 @@ import os
 import tempfile
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import patch
 
 from onvifscan import cli
@@ -69,6 +70,22 @@ class TestDiscoveryParse(unittest.TestCase):
             self.assertEqual(discover.call_args.kwargs["directed"], [
                 ("192.0.2.12", 1234), ("192.0.2.10", 3702),
                 ("192.0.2.11", 3702), ("192.0.2.13", 4567)])
+
+    def test_dual_stack_fixture_parses_and_merges_all_xaddrs(self):
+        fixture = Path(__file__).parent / "fixtures" / "dual_stack_probe.xml"
+        parsed = parse_probe_matches(fixture.read_bytes())
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0]["xaddrs"], [
+            "http://[2001:db8::10]:80/onvif/device_service",
+            "http://192.0.2.10/onvif/device_service",
+        ])
+
+        repeated = dict(parsed[0], xaddrs=[parsed[0]["xaddrs"][1]],
+                        source_ip="192.0.2.10")
+        parsed[0]["source_ip"] = "192.0.2.10"
+        merged = merge_matches([parsed[0], repeated])
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0]["xaddrs"], parsed[0]["xaddrs"])
 
 
 def _device(level="FULL"):

@@ -12,6 +12,7 @@ Credential discipline: at most one credentialed attempt per operation;
 a NotAuthorized fault marks auth failed for the device and no further
 credentialed calls are made to it.
 """
+import ipaddress
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -90,13 +91,27 @@ def _finding(code, severity, detail):
     return {"code": code, "severity": severity, "detail": detail}
 
 
+def _inventory_device_url(xaddrs):
+    """Prefer an advertised IPv4 XAddr for v0.1 inventory, retaining IPv6 too."""
+    for xaddr in xaddrs:
+        host = urlparse(xaddr).hostname
+        if not host:
+            continue
+        try:
+            if ipaddress.ip_address(host).version == 4:
+                return xaddr
+        except ValueError:
+            continue
+    return xaddrs[0] if xaddrs else None
+
+
 def scan_device(entry, cred_resolver, timeout=5.0):
     """Inventory one discovered device. entry: discovery.merge_matches item
     (or a synthetic directed entry with xaddrs set). cred_resolver:
     callable(ip, endpoint, mac) -> {"user","password"} | None."""
     scopes = P.parse_scopes(entry.get("scopes"))
     xaddrs = entry.get("xaddrs") or []
-    device_url = xaddrs[0] if xaddrs else None
+    device_url = _inventory_device_url(xaddrs)
     source_ip = (entry.get("source_ips") or [None])[0]
     host = urlparse(device_url).hostname if device_url else source_ip
     rec = {
