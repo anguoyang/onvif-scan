@@ -59,6 +59,8 @@ def main(argv=None):
     sc.add_argument("--json", default="onvif-inventory.json")
     sc.add_argument("--html", default="onvif-inventory.html")
     sc.add_argument("--no-html", action="store_true")
+    sc.add_argument("--quiet", action="store_true",
+                    help="print only the summary line and report paths (for cron)")
     args = ap.parse_args(argv)
 
     single_cred = None
@@ -127,9 +129,10 @@ def main(argv=None):
     if not args.no_html:
         with open(args.html, "w", encoding="utf-8") as f:
             f.write(render_html(report))
-    for line in terminal_lines(report):
+    lines = terminal_lines(report)
+    for line in lines[-1:] if args.quiet else lines:
         print(line)
-    if not devices_raw:
+    if not devices_raw and not args.quiet:
         print(ZERO_RESULT_HINT)
     print("reports: %s%s" % (args.json, "" if args.no_html else " + " + args.html))
     return 0

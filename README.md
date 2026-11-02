@@ -92,6 +92,13 @@ Outputs `onvif-inventory.json` and `onvif-inventory.html` in the current
 directory (paths configurable). Example reports — generated against
 simulated devices, clearly labelled — are in [`examples/`](examples/).
 
+For cron-driven inventory, add `--quiet` to print only the summary and report
+paths; the JSON and HTML reports are generated the same way:
+
+```sh
+PYTHONPATH=src python3 -m onvifscan scan --quiet
+```
+
 ## Reading the results
 
 Each device gets a level: **FULL** (identity + profiles), **PARTIAL**
