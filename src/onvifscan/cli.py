@@ -53,6 +53,8 @@ def main(argv=None):
     sc.add_argument("--host", action="append",
                     help="directed probe target host[:discovery-port] (repeatable); "
                          "for cross-VLAN or multicast-filtered networks")
+    sc.add_argument("--hosts",
+                    help="text file containing one directed probe host[:port] per line")
     sc.add_argument("--device-url", action="append",
                     help="skip discovery for this device service URL (repeatable)")
     sc.add_argument("--discovery-port", type=int, default=DISCOVERY_PORT)
@@ -97,8 +99,13 @@ def main(argv=None):
                 return 2
             ifaces.append((name, known[name]))
 
+    host_targets = list(args.host or [])
+    if args.hosts:
+        with open(args.hosts, encoding="utf-8") as f:
+            host_targets.extend(line.split("#", 1)[0].strip() for line in f)
+        host_targets = [h for h in host_targets if h]
     directed = []
-    for h in args.host or []:
+    for h in host_targets:
         host, _, p = h.rpartition(":")
         if host and p.isdigit():
             directed.append((host, int(p)))

@@ -1,9 +1,13 @@
 import base64
 import hashlib
+import os
+import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
+from onvifscan import cli
 from onvifscan.discovery import merge_matches, parse_probe_matches
 from onvifscan.report import build_report, render_html, scrub_secrets, terminal_lines
 from onvifscan.soap import build_wsse_header, password_digest
@@ -52,6 +56,20 @@ class TestDiscoveryParse(unittest.TestCase):
         self.assertEqual(len(merged), 1)
         self.assertEqual(len(merged[0]["xaddrs"]), 2)
         self.assertEqual(merged[0]["scopes"], "a much longer scopes string")
+
+    def test_hosts_file_combines_with_host_and_ignores_comments_and_blank_lines(self):
+        with tempfile.TemporaryDirectory() as directory:
+            hosts_path = os.path.join(directory, "hosts.txt")
+            with open(hosts_path, "w", encoding="utf-8") as hosts_file:
+                hosts_file.write("# full-line comment\n\n192.0.2.10\n192.0.2.11\n192.0.2.13:4567\n")
+            with patch.object(cli, "discover", return_value=([], {"interfaces": [], "subnets": [], "probe_count": 0})) as discover:
+                with patch.object(cli, "write_json"):
+                    cli.main(["scan", "--host", "192.0.2.12:1234", "--hosts", hosts_path,
+                              "--no-html", "--json", os.path.join(directory, "out.json")])
+            discover.assert_called_once()
+            self.assertEqual(discover.call_args.kwargs["directed"], [
+                ("192.0.2.12", 1234), ("192.0.2.10", 3702),
+                ("192.0.2.11", 3702), ("192.0.2.13", 4567)])
 
     def test_dual_stack_fixture_parses_and_merges_all_xaddrs(self):
         fixture = Path(__file__).parent / "fixtures" / "dual_stack_probe.xml"
