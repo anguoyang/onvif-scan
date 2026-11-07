@@ -7,6 +7,7 @@ returns None/empty rather than raising, so one malformed device can
 never break a whole scan.
 """
 import re
+import math
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from urllib.parse import unquote, urlparse
@@ -201,6 +202,7 @@ def _profile_from_element(el):
     p = {"token": el.get("token"), "name": first_text(el, "Name"),
          "source_token": None, "codec": None, "width": None, "height": None,
          "video_source_token": None, "encoder_configuration_token": None,
+         "source_configuration_name": None, "source_name_origin": None,
          "ptz_configuration_token": None, "ptz_node_token": None,
          "fps_limit": None, "bitrate_limit_kbps": None, "ptz_config": False}
     # Media1 has direct *Configuration children; Media2 uses Configurations.
@@ -215,6 +217,9 @@ def _profile_from_element(el):
             # Schema 1 compatibility: source_token is the configuration token.
             p["source_token"] = sub.get("token")
             p["video_source_token"] = sub.get("SourceToken") or first_text(sub, "SourceToken")
+            p["source_configuration_name"] = first_text(sub, "Name")
+            if p["source_configuration_name"] is not None:
+                p["source_name_origin"] = "VideoSourceConfiguration.Name"
         elif name in ("VideoEncoderConfiguration", "VideoEncoder"):
             p["encoder_configuration_token"] = sub.get("token")
         elif name in ("PTZConfiguration", "PTZ"):
@@ -261,6 +266,130 @@ def parse_profiles(xml, media_gen):
             prof["snapshot_uri"] = None
             profiles.append(prof)
     return profiles, malformed
+
+
+def _child(el, name):
+    return next((child for child in el if local(child) == name), None)
+
+
+def _value(el, name):
+    child = _child(el, name)
+    if child is None:
+        return None
+    return (child.text or "").strip() or None
+
+
+def _number(raw, integer=False):
+    try:
+        value = int(raw) if integer else float(raw)
+        return value if math.isfinite(value) else None
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def _range(el, name):
+    child = _child(el, name)
+    if child is None:
+        return None
+    return {"min": _number(_value(child, "Min")),
+            "max": _number(_value(child, "Max"))}
+
+
+def parse_encoder_options(xml, media_gen):
+    """Device declarations, not a Cartesian product of usable settings.
+
+    Keep Media1 base and Extension declarations separate: conflicting fields
+    must not be silently merged. Media2 lists retain floating point values.
+    """
+    root, malformed = safe_parse(xml)
+    response = next((e for e in root.iter()
+                     if local(e) == "GetVideoEncoderConfigurationOptionsResponse"),
+                    None) if root is not None else None
+    if response is None:
+        return None, True
+    declarations = []
+    for options in response:
+        if local(options) != "Options":
+            continue
+        if media_gen == 2:
+            branches = [(options, _value(options, "Encoding"), "Options")]
+        else:
+            branches = [(c, local(c), "Options") for c in options
+                        if local(c) in ("JPEG", "MPEG4", "H264")]
+            extension = _child(options, "Extension")
+            if extension is not None:
+                branches.extend((c, local(c), "Options.Extension") for c in extension
+                                if local(c) in ("JPEG", "MPEG4", "H264"))
+        for branch, encoding, origin in branches:
+            resolutions = [{"width": _number(_value(c, "Width"), True),
+                            "height": _number(_value(c, "Height"), True)}
+                           for c in branch if local(c) == "ResolutionsAvailable"]
+            rates = branch.get("FrameRatesSupported") if media_gen == 2 else None
+            gov = branch.get("GovLengthRange") if media_gen == 2 else None
+            profiles = (branch.get("ProfilesSupported").split()
+                        if branch.get("ProfilesSupported") is not None else None)
+            if media_gen == 1:
+                profiles = [c.text.strip() if c.text else None for c in branch
+                            if local(c) in ("H264ProfilesSupported", "Mpeg4ProfilesSupported")] or None
+            declarations.append({
+                "encoding": encoding, "origin": origin,
+                "resolutions": resolutions or None,
+                "frame_rate_range": _range(branch, "FrameRateRange") if media_gen == 1 else None,
+                "frame_rates_supported": [_number(v) for v in rates.split()] if rates is not None else None,
+                "bitrate_range_kbps": _range(branch, "BitrateRange"),
+                "gov_length_range": ([_number(v, True) for v in gov.split()] if gov is not None
+                                     else _range(branch, "GovLengthRange")),
+                "profiles_supported": profiles,
+                "quality_range": _range(options, "QualityRange"),
+                "encoding_interval_range": _range(branch, "EncodingIntervalRange"),
+            })
+    encodings = list(dict.fromkeys(d["encoding"] for d in declarations if d["encoding"] is not None))
+    return {"encodings": encodings, "declarations": declarations}, malformed
+
+
+def _boolean(raw):
+    return {"true": True, "1": True, "false": False, "0": False}.get(raw)
+
+
+def parse_ptz_nodes(xml):
+    """Only node declarations; no PTZ spaces, coordinates or private data."""
+    root, malformed = safe_parse(xml)
+    response = next((e for e in root.iter() if local(e) in ("GetNodesResponse", "GetNodeResponse")),
+                    None) if root is not None else None
+    if response is None:
+        return None, True
+    nodes = []
+    for el in response:
+        if local(el) != "PTZNode":
+            continue
+        extension = _child(el, "Extension")
+        tour = _child(extension, "SupportedPresetTour") if extension is not None else None
+        nodes.append({
+            "token": el.get("token"), "name": _value(el, "Name"),
+            "maximum_number_of_presets": _number(_value(el, "MaximumNumberOfPresets"), True),
+            "home_supported": _boolean(_value(el, "HomeSupported")),
+            "fixed_home_position": _boolean(el.get("FixedHomePosition")),
+            "supported_preset_tour": None if tour is None else {
+                "maximum_number_of_preset_tours": _number(_value(tour, "MaximumNumberOfPresetTours"), True),
+                "operations": [(c.text or "").strip() for c in tour
+                               if local(c) == "PTZPresetTourOperation"] or None,
+            },
+        })
+    return nodes, malformed
+
+
+def parse_ptz_presets(xml):
+    """Successful empty is zero; missing/failed response is unknown.
+
+    Do not export tokens or coordinates, and do not deduplicate names.
+    """
+    root, malformed = safe_parse(xml)
+    response = next((e for e in root.iter() if local(e) == "GetPresetsResponse"),
+                    None) if root is not None else None
+    if response is None:
+        return None, True
+    names = [_value(e, "Name") for e in response if local(e) == "Preset"]
+    return {"count": len(names), "names": names}, malformed
 
 
 def parse_stream_uri(xml):

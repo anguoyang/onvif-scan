@@ -96,10 +96,48 @@ def render_html(report):
                                            p0.get("height") or "") if p0 else "—"),
                         "yes" if d["ptz"]["present"] else "no", _esc(d["level"])))
         prof_rows = "".join(
-            "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s×%s</td><td>%s</td><td>%s</td></tr>" % (
-                _esc(p["token"]), _esc(p.get("source_token")), _esc(p.get("codec")),
+            "<tr><td>%s (Media%s)</td><td>%s</td><td>%s</td><td>%s (%s)</td>"
+            "<td>%s</td><td>%s×%s</td><td>%s</td><td>%s</td></tr>" % (
+                _esc(p["token"]), _esc(p.get("media_gen")), _esc(p.get("video_source_token")),
+                _esc(p.get("source_token")), _esc(p.get("source_configuration_name")),
+                _esc(p.get("source_name_origin")), _esc(p.get("codec")),
                 _esc(p.get("width")), _esc(p.get("height")), _esc(p.get("fps_limit")),
                 _esc(p.get("stream_uri"))) for p in d["profiles"])
+        profile_details = ""
+        for p in d["profiles"]:
+            options = p.get("encoder_options", {})
+            profile_details += "<h4>Profile %s (Media%s)</h4><p>Encoder options: %s · %s</p>" % (
+                _esc(p.get("token")), _esc(p.get("media_gen")),
+                _esc(options.get("status", "unqueried")), _esc(options.get("reason")))
+            if options.get("data") is not None:
+                profile_details += ("<p>Device declarations only; arbitrary combinations of encoding, "
+                                    "resolution and frame rate are not guaranteed.</p>")
+                for declaration in options["data"]["declarations"]:
+                    profile_details += "<dl>%s</dl>" % "".join(
+                        "<dt>%s</dt><dd>%s</dd>" % (_esc(key), _esc(json.dumps(value, ensure_ascii=False)))
+                        for key, value in declaration.items())
+            presets = p.get("ptz_presets", {})
+            preset_data = presets.get("data") or {}
+            profile_details += ("<p>PTZ configuration %s · node %s · node status %s (%s)</p>"
+                                "<p>Presets: %s (%s) · actual count %s · names %s</p>") % (
+                _esc(p.get("ptz_configuration_token")), _esc(p.get("ptz_node_token")),
+                _esc(p.get("ptz_node_status", "unqueried")), _esc(p.get("ptz_node_reason")),
+                _esc(presets.get("status", "unqueried")), _esc(presets.get("reason")),
+                _esc(preset_data.get("count")), _esc(preset_data.get("names")))
+        ptz = d.get("ptz", {})
+        profile_details += "<h4>PTZ node declarations</h4><p>GetNodes: %s (%s)</p>" % (
+            _esc(ptz.get("nodes_status", "unqueried")), _esc(ptz.get("nodes_reason")))
+        for node in ptz.get("nodes", []):
+            data = node.get("data") or {}
+            profile_details += ("<p>Node %s (%s) · %s (%s) · source %s</p>"
+                                "<dl><dt>Preset capacity (MaximumNumberOfPresets)</dt><dd>%s</dd>"
+                                "<dt>HomeSupported</dt><dd>%s</dd><dt>FixedHomePosition</dt><dd>%s</dd>"
+                                "<dt>SupportedPresetTour declaration</dt><dd>%s</dd></dl>") % (
+                _esc(node.get("token")), _esc(data.get("name")),
+                _esc(node.get("status")), _esc(node.get("reason")),
+                _esc(node.get("source")), _esc(data.get("maximum_number_of_presets")),
+                _esc(data.get("home_supported")), _esc(data.get("fixed_home_position")),
+                _esc(json.dumps(data.get("supported_preset_tour"), ensure_ascii=False)))
         declared = d.get("services_declared")
         if declared is None:
             service_html = "<p>Services declared: not obtained</p>"
@@ -130,9 +168,13 @@ def render_html(report):
                 _esc(d["level"]), _esc(d.get("mac")), _esc(d.get("mac_source")),
                 _esc(d["clock"].get("offset_s")), _esc(d["auth"]["mode"]),
                 _esc(d["auth"]["result"]), _esc(info.get("SerialNumber")),
-                service_html,
-                ("<table><tr><th>profile</th><th>source</th><th>codec</th><th>size</th>"
-                 "<th>fps</th><th>stream (password masked)</th></tr>%s</table>" % prof_rows)
+                service_html + profile_details,
+                ("<p>Profile-visible sources only; configuration names are not physical source names. "
+                 "Legacy channel count basis: %s.</p>"
+                 "<table><tr><th>profile</th><th>source token</th><th>source configuration token</th>"
+                 "<th>configuration name (origin)</th><th>codec</th><th>size</th>"
+                 "<th>fps</th><th>stream (password masked)</th></tr>%s</table>" %
+                 (_esc(d.get("channel_count_basis")), prof_rows))
                 if prof_rows else "",
                 ("<ul>%s</ul>" % find_items) if find_items else "",
                 ("<p>Next step (stream acceptance):</p><ul>%s</ul>" % steps) if steps else ""))
