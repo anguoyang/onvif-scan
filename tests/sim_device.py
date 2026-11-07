@@ -112,19 +112,36 @@ def encoder_options_response(media2=False):
     if media2:
         options = ''.join('<m:Options FrameRatesSupported="1 15 29.97 59.94" '
                           'GovLengthRange="1 120" ProfilesSupported="Main High">'
-                          '<tt:Encoding>%s</tt:Encoding>%s%s</m:Options>'
+                          '<tt:Encoding>%s</tt:Encoding><tt:QualityRange><tt:Min>1</tt:Min>'
+                          '<tt:Max>6</tt:Max></tt:QualityRange>%s%s</m:Options>'
                           % (codec, resolution, bitrate) for codec in ('H264', 'H265'))
     else:
         codec_options = ('%s<tt:FrameRateRange><tt:Min>1</tt:Min><tt:Max>30</tt:Max>'
-                         '</tt:FrameRateRange><tt:GovLengthRange><tt:Min>1</tt:Min>'
+                         '</tt:FrameRateRange><tt:EncodingIntervalRange><tt:Min>1</tt:Min>'
+                         '<tt:Max>4</tt:Max></tt:EncodingIntervalRange>'
+                         '<tt:GovLengthRange><tt:Min>1</tt:Min>'
                          '<tt:Max>120</tt:Max></tt:GovLengthRange>'
                          '<tt:H264ProfilesSupported>Main</tt:H264ProfilesSupported>' % resolution)
         options = ('<m:Options><tt:QualityRange><tt:Min>1</tt:Min><tt:Max>6</tt:Max>'
                    '</tt:QualityRange><tt:JPEG>%s</tt:JPEG><tt:H264>%s</tt:H264>'
                    '<tt:Extension><tt:H264>%s%s</tt:H264></tt:Extension></m:Options>'
-                   % (resolution, codec_options, codec_options, bitrate))
+                   % (resolution + '<tt:FrameRateRange><tt:Min>1</tt:Min><tt:Max>30</tt:Max>'
+                      '</tt:FrameRateRange><tt:EncodingIntervalRange><tt:Min>1</tt:Min>'
+                      '<tt:Max>4</tt:Max></tt:EncodingIntervalRange>',
+                      codec_options, codec_options, bitrate))
     return envelope('<m:GetVideoEncoderConfigurationOptionsResponse xmlns:m="%s" xmlns:tt="%s">'
                     '%s</m:GetVideoEncoderConfigurationOptionsResponse>' % (ns, TT, options))
+
+
+def ptz_node_xml(token="PTZNode", capacity=80, home=True, tours=2):
+    extension = ('' if tours is None else '<tt:Extension><tt:SupportedPresetTour>'
+                 '<tt:MaximumNumberOfPresetTours>%d</tt:MaximumNumberOfPresetTours>'
+                 '<tt:PTZPresetTourOperation>Start</tt:PTZPresetTourOperation>'
+                 '</tt:SupportedPresetTour></tt:Extension>' % tours)
+    return ('<t:PTZNode token="%s" FixedHomePosition="false"><tt:Name>Sim node</tt:Name>'
+            '<tt:SupportedPTZSpaces/><tt:MaximumNumberOfPresets>%d</tt:MaximumNumberOfPresets>'
+            '<tt:HomeSupported>%s</tt:HomeSupported>%s</t:PTZNode>'
+            % (token, capacity, str(home).lower(), extension))
 
 
 def handle_soap(p, path, raw):
@@ -216,6 +233,39 @@ def handle_soap(p, path, raw):
             '<tt:Config><tt:Manual><tt:Address>127.0.0.1</tt:Address><tt:PrefixLength>8</tt:PrefixLength>'
             '</tt:Manual><tt:DHCP>false</tt:DHCP></tt:Config></tt:IPv4></tds:NetworkInterfaces>'
             '</tds:GetNetworkInterfacesResponse>' % (TDS, TT, mac))
+    if op in ("GetNodes", "GetNode", "GetPresets"):
+        ns = "http://www.onvif.org/ver20/ptz/wsdl"
+        request = list(body)[0]
+        parameter = {"GetNode": "NodeToken", "GetPresets": "ProfileToken"}.get(op)
+        children = list(request)
+        if (operation != "{%s}%s" % (ns, op) or path != "/onvif/PTZ"
+                or (parameter is None and children)
+                or (parameter is not None and (len(children) != 1
+                    or children[0].tag != "{%s}%s" % (ns, parameter)))):
+            return 400, fault("invalid PTZ request", "InvalidArgVal")
+        if not p["ptz"]:
+            return 400, fault("PTZ unsupported", "ActionNotSupported")
+        if not check_auth(p, root):
+            return 401, fault()
+        token = children[0].text if children else None
+        p["calls"][-1]["token"] = token
+        node_tokens = ["PTZNode"] if p["media2"] else ["PTZNode", "FixedNode"]
+        if op == "GetPresets":
+            if token not in [profile[0] for profile in p["profiles"]]:
+                return 400, fault("unknown profile", "InvalidArgVal")
+            payload = ('' if p.get("empty_presets") else
+                       '<t:Preset token="1"><tt:Name>Entrance</tt:Name>'
+                       '<tt:PTZPosition><tt:PanTilt x="0.125" y="-0.5"/></tt:PTZPosition></t:Preset>'
+                       '<t:Preset token="2"><tt:Name>Entrance</tt:Name></t:Preset>')
+        else:
+            if op == "GetNode" and token not in node_tokens:
+                return 400, fault("unknown node", "InvalidArgVal")
+            selected = node_tokens if op == "GetNodes" else [token]
+            payload = ''.join(ptz_node_xml(n, 80 if n == "PTZNode" else 0,
+                                           n == "PTZNode", p.get("preset_tours", 2) if n == "PTZNode" else 0)
+                              for n in selected)
+        return 200, envelope('<t:%sResponse xmlns:t="%s" xmlns:tt="%s">%s</t:%sResponse>'
+                             % (op, ns, TT, payload, op))
     if op == "GetVideoEncoderConfigurationOptions":
         # D1 conflict: do not implement a Media2 request contract until resolved.
         if p["media2"]:

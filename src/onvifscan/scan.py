@@ -5,7 +5,7 @@ B2 GetCapabilities / GetServices -> service XAddrs
 B3 GetDeviceInformation (no auth first; credentialed retry once)
 B4 GetHostname / GetNetworkInterfaces (when auth state allows)
 B5 Media/Media2 GetProfiles + GetStreamUri / GetSnapshotUri per profile
-B6 PTZ presence from capabilities / profile configs (read-only judgement)
+B6 PTZ node declarations and per-profile preset counts/names (read-only)
 B7 XAddr host mismatch -> fall back to the discovery source IP
 
 Credential discipline: one user-supplied credential per device, with no
@@ -22,6 +22,7 @@ from .soap import fault_kind, is_fault, soap_call
 TDS = "http://www.onvif.org/ver10/device/wsdl"
 TRT = "http://www.onvif.org/ver10/media/wsdl"
 TR2 = "http://www.onvif.org/ver20/media/wsdl"
+TPTZ = "http://www.onvif.org/ver20/ptz/wsdl"
 
 BODY_TIME = '<tds:GetSystemDateAndTime xmlns:tds="%s"/>' % TDS
 BODY_CAPS = ('<tds:GetCapabilities xmlns:tds="%s"><tds:Category>All</tds:Category>'
@@ -32,6 +33,7 @@ BODY_DEVINFO = '<tds:GetDeviceInformation xmlns:tds="%s"/>' % TDS
 BODY_HOSTNAME = '<tds:GetHostname xmlns:tds="%s"/>' % TDS
 BODY_NETIF = '<tds:GetNetworkInterfaces xmlns:tds="%s"/>' % TDS
 BODY_PROFILES1 = '<trt:GetProfiles xmlns:trt="%s"/>' % TRT
+BODY_NODES = '<tptz:GetNodes xmlns:tptz="%s"/>' % TPTZ
 BODY_PROFILES2 = '<tr2:GetProfiles xmlns:tr2="%s"/>' % TR2
 
 
@@ -54,6 +56,11 @@ def _encoder_options_body(token):
     return ('<trt:GetVideoEncoderConfigurationOptions xmlns:trt="%s">'
             '<trt:ConfigurationToken>%s</trt:ConfigurationToken>'
             '</trt:GetVideoEncoderConfigurationOptions>') % (TRT, escape(token))
+
+
+def _ptz_body(operation, parameter, token):
+    return ('<tptz:{op} xmlns:tptz="{ns}"><tptz:{param}>{token}</tptz:{param}>'
+            '</tptz:{op}>').format(op=operation, param=parameter, ns=TPTZ, token=escape(token))
 
 
 def _swap_host(url, new_host):
@@ -98,7 +105,8 @@ class _Caller:
     def query(self, url, body, parser):
         """Status-bearing optional Get query through the same credential gate."""
         status, text = self.call(url, body, auth=bool(self.cred))
-        if self.auth_failed or status == 401 or fault_kind(text) == "NotAuthorized":
+        if (self.auth_failed or fault_kind(text) == "NotAuthorized"
+                or (status == 401 and not is_fault(text))):
             return {"status": "auth_blocked", "reason": "authentication rejected or blocked",
                     "data": None}
         if fault_kind(text) == "NotSupported":
@@ -148,7 +156,8 @@ def scan_device(entry, cred_resolver, timeout=5.0):
         "services": {}, "service_sources": {}, "services_declared": None,
         "profiles": [], "channel_count": 0,
         "channel_count_basis": "profiles",
-        "ptz": {"present": False, "evidence": None},
+        "ptz": {"present": False, "evidence": None,
+                "nodes_status": "unqueried", "nodes_reason": "not reached", "nodes": []},
         "auth": {"mode": "none", "username": None, "result": "not_tried"},
         "level": "UNREACHABLE", "findings": [], "next_steps": [],
     }
@@ -279,7 +288,6 @@ def scan_device(entry, cred_resolver, timeout=5.0):
                                   lambda xml: P.parse_encoder_options(xml, 1))
         prof["encoder_options"] = result
     # stream + snapshot URIs per profile (bounded)
-    svc_by_gen = {1: services.get("media"), 2: services.get("media2")}
     for prof in profiles[:8]:
         svc = svc_by_gen.get(prof["media_gen"])
         if not svc:
@@ -301,15 +309,62 @@ def scan_device(entry, cred_resolver, timeout=5.0):
     rec["channel_count"] = len(sources) if sources else len(profiles)
     rec["channel_count_basis"] = "video_source" if sources else "profiles"
 
-    # B6: PTZ presence (judgement only — no PTZ service calls beyond caps)
+    # B6: PTZ declarations; enumerate once and supplement only missing nodes.
     ptz_evidence = []
     if services.get("ptz"):
         ptz_evidence.append("capability_xaddr" if service_sources["ptz"] == "GetCapabilities"
                             else "service_xaddr")
     if any(p["ptz_config"] for p in profiles):
         ptz_evidence.append("profile_config")
-    rec["ptz"] = {"present": bool(ptz_evidence),
-                  "evidence": "+".join(ptz_evidence) if ptz_evidence else None}
+    ptz = rec["ptz"]
+    ptz.update(present=bool(ptz_evidence),
+               evidence="+".join(ptz_evidence) if ptz_evidence else None)
+    ptz_svc = services.get("ptz")
+    ptz["nodes_reason"] = "no PTZ service route"
+    nodes = {}
+    if ptz_svc:
+        enumeration = caller.query(ptz_svc, BODY_NODES, P.parse_ptz_nodes)
+        ptz["nodes_status"] = enumeration["status"]
+        ptz["nodes_reason"] = enumeration["reason"]
+        for node in enumeration["data"] or []:
+            token = node["token"]
+            if token not in nodes:
+                nodes[token] = {"token": token, "status": "ok", "reason": None,
+                                "source": "GetNodes", "data": node}
+    for prof in profiles:
+        token = prof["ptz_node_token"]
+        if token and token not in nodes:
+            nodes[token] = {"token": token, "status": "unqueried", "reason": "node not obtained",
+                            "source": None, "data": None}
+    for token, node in nodes.items():
+        data = node["data"]
+        # Optional missing FixedHomePosition / SupportedPresetTour is unknown,
+        # not a reason to issue another request for a complete node declaration.
+        complete = data is not None and all(data[k] is not None for k in
+                                            ("maximum_number_of_presets", "home_supported"))
+        if not complete and token and ptz_svc:
+            result = caller.query(ptz_svc, _ptz_body("GetNode", "NodeToken", token), P.parse_ptz_nodes)
+            matched = next((n for n in result["data"] or [] if n["token"] == token), None)
+            if result["status"] == "ok" and matched is None:
+                result.update(status="failed", reason="requested node absent from response")
+            node.update(status=result["status"], reason=result["reason"], source="GetNode", data=matched)
+    ptz["nodes"] = list(nodes.values())
+    for prof in profiles:
+        node = nodes.get(prof["ptz_node_token"])
+        prof["ptz_node_status"] = node["status"] if node else "unqueried"
+        prof["ptz_node_reason"] = node["reason"] if node else "no associated NodeToken"
+        result = {"status": "unqueried", "reason": "no PTZ configuration", "data": None}
+        if prof["ptz_config"]:
+            if caller.auth_failed:
+                result.update(status="auth_blocked", reason="authentication gate closed")
+            elif not ptz_svc:
+                result["reason"] = "no PTZ service route"
+            elif not prof["token"]:
+                result["reason"] = "missing profile token"
+            else:
+                result = caller.query(ptz_svc, _ptz_body("GetPresets", "ProfileToken", prof["token"]),
+                                      P.parse_ptz_presets)
+        prof["ptz_presets"] = result
 
     # auth result rollup
     if cred:

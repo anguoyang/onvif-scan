@@ -274,7 +274,9 @@ def _child(el, name):
 
 def _value(el, name):
     child = _child(el, name)
-    return (child.text or "").strip() or None if child is not None else None
+    if child is None:
+        return None
+    return (child.text or "").strip() or None
 
 
 def _number(raw, integer=False):
@@ -343,6 +345,51 @@ def parse_encoder_options(xml, media_gen):
             })
     encodings = list(dict.fromkeys(d["encoding"] for d in declarations if d["encoding"] is not None))
     return {"encodings": encodings, "declarations": declarations}, malformed
+
+
+def _boolean(raw):
+    return {"true": True, "1": True, "false": False, "0": False}.get(raw)
+
+
+def parse_ptz_nodes(xml):
+    """Only node declarations; no PTZ spaces, coordinates or private data."""
+    root, malformed = safe_parse(xml)
+    response = next((e for e in root.iter() if local(e) in ("GetNodesResponse", "GetNodeResponse")),
+                    None) if root is not None else None
+    if response is None:
+        return None, True
+    nodes = []
+    for el in response:
+        if local(el) != "PTZNode":
+            continue
+        extension = _child(el, "Extension")
+        tour = _child(extension, "SupportedPresetTour") if extension is not None else None
+        nodes.append({
+            "token": el.get("token"), "name": _value(el, "Name"),
+            "maximum_number_of_presets": _number(_value(el, "MaximumNumberOfPresets"), True),
+            "home_supported": _boolean(_value(el, "HomeSupported")),
+            "fixed_home_position": _boolean(el.get("FixedHomePosition")),
+            "supported_preset_tour": None if tour is None else {
+                "maximum_number_of_preset_tours": _number(_value(tour, "MaximumNumberOfPresetTours"), True),
+                "operations": [(c.text or "").strip() for c in tour
+                               if local(c) == "PTZPresetTourOperation"] or None,
+            },
+        })
+    return nodes, malformed
+
+
+def parse_ptz_presets(xml):
+    """Successful empty is zero; missing/failed response is unknown.
+
+    Do not export tokens or coordinates, and do not deduplicate names.
+    """
+    root, malformed = safe_parse(xml)
+    response = next((e for e in root.iter() if local(e) == "GetPresetsResponse"),
+                    None) if root is not None else None
+    if response is None:
+        return None, True
+    names = [_value(e, "Name") for e in response if local(e) == "Preset"]
+    return {"count": len(names), "names": names}, malformed
 
 
 def parse_stream_uri(xml):
