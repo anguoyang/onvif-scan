@@ -166,12 +166,30 @@ def parse_hostname(xml):
 def _profile_from_element(el):
     p = {"token": el.get("token"), "name": first_text(el, "Name"),
          "source_token": None, "codec": None, "width": None, "height": None,
+         "video_source_token": None, "encoder_configuration_token": None,
+         "ptz_configuration_token": None, "ptz_node_token": None,
          "fps_limit": None, "bitrate_limit_kbps": None, "ptz_config": False}
+    # Media1 has direct *Configuration children; Media2 uses Configurations.
+    # Keep accepting the old Media1-shaped Media2 responses as well.
+    configs = list(el)
+    for child in el:
+        if local(child) == "Configurations":
+            configs.extend(child)
+    for sub in configs:
+        name = local(sub)
+        if name in ("VideoSourceConfiguration", "VideoSource"):
+            # Schema 1 compatibility: source_token is the configuration token.
+            p["source_token"] = sub.get("token")
+            p["video_source_token"] = sub.get("SourceToken") or first_text(sub, "SourceToken")
+        elif name in ("VideoEncoderConfiguration", "VideoEncoder"):
+            p["encoder_configuration_token"] = sub.get("token")
+        elif name in ("PTZConfiguration", "PTZ"):
+            p["ptz_config"] = True
+            p["ptz_configuration_token"] = sub.get("token")
+            p["ptz_node_token"] = first_text(sub, "NodeToken")
     for sub in el.iter():
         name = local(sub)
-        if name == "VideoSourceConfiguration" and p["source_token"] is None:
-            p["source_token"] = sub.get("token")
-        elif name == "Encoding" and p["codec"] is None:
+        if name == "Encoding" and p["codec"] is None:
             p["codec"] = (sub.text or "").strip() or None
         elif name == "Width":
             try:
@@ -193,8 +211,6 @@ def _profile_from_element(el):
                 p["bitrate_limit_kbps"] = int(float(sub.text))
             except (TypeError, ValueError):
                 pass
-        elif name == "PTZConfiguration":
-            p["ptz_config"] = True
     return p
 
 

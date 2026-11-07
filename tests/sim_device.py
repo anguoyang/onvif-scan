@@ -91,11 +91,11 @@ def check_auth(p, root):
     return expect == digest
 
 
-def fault(msg="authentication required / failed"):
+def fault(msg="authentication required / failed", kind="NotAuthorized"):
     return ('<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Body><s:Fault>'
-            '<s:Code><s:Value>s:Sender</s:Value><s:Subcode><s:Value>ter:NotAuthorized</s:Value>'
+            '<s:Code><s:Value>s:Sender</s:Value><s:Subcode><s:Value>ter:%s</s:Value>'
             '</s:Subcode></s:Code><s:Reason><s:Text xml:lang="en">%s</s:Text></s:Reason>'
-            '</s:Fault></s:Body></s:Envelope>' % msg)
+            '</s:Fault></s:Body></s:Envelope>' % (kind, msg))
 
 
 def envelope(body):
@@ -107,7 +107,18 @@ def handle_soap(p, path, raw):
     try:
         root = ET.fromstring(raw)
     except ET.ParseError:
-        return 400, fault("unparseable")
+        return 400, fault("unparseable", "InvalidArgVal")
+    body = root.find("{http://www.w3.org/2003/05/soap-envelope}Body")
+    operation = list(body)[0].tag if body is not None and len(body) else ""
+    op = operation.split("}")[-1]
+    authenticated = root.find(".//wsse:UsernameToken", NS) is not None
+    # Metadata only: never retain raw SOAP, digests, nonces or passwords.
+    p.setdefault("calls", []).append({"operation": op, "qname": operation,
+                                      "path": path, "credentialed": authenticated})
+    if op in p.get("responses", {}):
+        return p["responses"][op]
+    if authenticated and op == p.get("reject_at"):
+        return (401, "") if p.get("bare_401") else (401, fault())
     text = raw.decode("utf-8", "ignore")
     base = "http://127.0.0.1:%d" % p["port"]
     if "GetSystemDateAndTime" in text:
@@ -184,6 +195,18 @@ def handle_soap(p, path, raw):
                       '<tt:RateControl><tt:FrameRateLimit>%d</tt:FrameRateLimit><tt:BitrateLimit>4096</tt:BitrateLimit></tt:RateControl>'
                       '</tt:VideoEncoderConfiguration>%s</Profiles>'
                       % (token, token, codec, w, h, fps, ptzcfg))
+        if gen2:
+            for old, new in (("VideoSourceConfiguration", "VideoSource"),
+                             ("VideoEncoderConfiguration", "VideoEncoder"),
+                             ("PTZConfiguration", "PTZ")):
+                profs = profs.replace("tt:" + old, "tr2:" + new)
+            profs = profs.replace('<tr2:VideoSource ', '<tr2:Configurations><tr2:VideoSource ')
+            profs = profs.replace('</Profiles>', '</tr2:Configurations></tr2:Profiles>')
+            profs = profs.replace('<Profiles ', '<tr2:Profiles ')
+        # Legacy retains its v0.1 response shape, including missing SourceToken.
+        if p.get("source_tokens", not p["manufacturer"].startswith("OldBrand")):
+            profs = profs.replace('<tt:Name>VS</tt:Name>',
+                                  '<tt:Name>VS</tt:Name><tt:SourceToken>Sensor_1</tt:SourceToken>')
         tag = "tr2" if gen2 else "trt"
         ns = "http://www.onvif.org/ver20/media/wsdl" if gen2 else "http://www.onvif.org/ver10/media/wsdl"
         return 200, envelope(
@@ -206,7 +229,7 @@ def handle_soap(p, path, raw):
             '<%s:%sResponse xmlns:%s="%s" xmlns:tt="%s"><%s:MediaUri><tt:Uri>%s</tt:Uri>'
             '<tt:InvalidAfterConnect>false</tt:InvalidAfterConnect></%s:MediaUri></%s:%sResponse>'
             % (tag, op, tag, ns, TT, tag, uri, tag, tag, op))
-    return 400, fault("unsupported operation")
+    return 400, fault("unsupported operation", "ActionNotSupported")
 
 
 def _handler(p):
@@ -268,16 +291,23 @@ def _discovery_loop(p, urn):
 class SimDevices:
     """Context manager: run all (or one) persona servers on localhost."""
 
-    def __init__(self, names=None):
+    def __init__(self, names=None, http_only=False, overrides=None):
         self.names = names or list(PERSONAS)
+        self.http_only = http_only
+        self.overrides = overrides or {}
+        self.personas = {}
         self.servers = []
 
     def __enter__(self):
         for name in self.names:
-            p = PERSONAS[name]
-            threading.Thread(target=_discovery_loop, args=(p, str(uuid.uuid4())),
-                             daemon=True).start()
-            srv = HTTPServer(("127.0.0.1", p["port"]), _handler(p))
+            p = dict(PERSONAS[name], **self.overrides.get(name, {}))
+            p["calls"] = []
+            self.personas[name] = p
+            if not self.http_only:
+                threading.Thread(target=_discovery_loop, args=(p, str(uuid.uuid4())),
+                                 daemon=True).start()
+            srv = HTTPServer(("127.0.0.1", 0 if self.http_only else p["port"]), _handler(p))
+            p["port"] = srv.server_port
             threading.Thread(target=srv.serve_forever, daemon=True).start()
             self.servers.append(srv)
         time.sleep(0.2)
@@ -286,4 +316,5 @@ class SimDevices:
     def __exit__(self, *exc):
         for srv in self.servers:
             srv.shutdown()
+            srv.server_close()
         return False

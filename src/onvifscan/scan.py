@@ -8,9 +8,8 @@ B5 Media/Media2 GetProfiles + GetStreamUri / GetSnapshotUri per profile
 B6 PTZ presence from capabilities / profile configs (read-only judgement)
 B7 XAddr host mismatch -> fall back to the discovery source IP
 
-Credential discipline: at most one credentialed attempt per operation;
-a NotAuthorized fault marks auth failed for the device and no further
-credentialed calls are made to it.
+Credential discipline: one user-supplied credential per device, with no
+credentialed calls after rejection (NotAuthorized or bare HTTP 401).
 """
 import ipaddress
 from datetime import datetime, timezone
@@ -72,6 +71,8 @@ class _Caller:
     def call(self, url, body, auth=False):
         """One SOAP call; on transport failure with a differing source IP,
         retry once against the source IP (the XAddr-mismatch fallback)."""
+        if auth and self.auth_failed:
+            return None, "ERROR: credentialed call blocked after authentication failure"
         user = self.cred["user"] if (auth and self.cred) else None
         pw = self.cred["password"] if (auth and self.cred) else None
         status, text = soap_call(url, body, user, pw, self.offset_s, self.timeout)
@@ -82,7 +83,7 @@ class _Caller:
         if auth and self.cred:
             if status == 200 and not is_fault(text):
                 self.auth_ok = True
-            elif fault_kind(text) == "NotAuthorized":
+            elif fault_kind(text) == "NotAuthorized" or (status == 401 and not is_fault(text)):
                 self.auth_failed = True
         return status, text
 
@@ -122,6 +123,7 @@ def scan_device(entry, cred_resolver, timeout=5.0):
         "mac": scopes.get("mac"), "mac_source": "scopes" if scopes.get("mac") else None,
         "ipv4": None, "clock": {"device_time": None, "offset_s": None, "skew": False},
         "services": {}, "profiles": [], "channel_count": 0,
+        "channel_count_basis": "profiles",
         "ptz": {"present": False, "evidence": None},
         "auth": {"mode": "none", "username": None, "result": "not_tried"},
         "level": "UNREACHABLE", "findings": [], "next_steps": [],
@@ -163,12 +165,12 @@ def scan_device(entry, cred_resolver, timeout=5.0):
             rec["findings"].append(_finding(
                 "UNAUTH_CAPS_DISCLOSURE", "info",
                 "GetCapabilities answered without authentication"))
-    if not services and cred and not caller.auth_failed:
+    if not services and cred:
         status, text = caller.call(device_url, BODY_CAPS, auth=True)
         if status == 200:
             services, malformed = P.parse_capabilities(text)
             caller.malformed = caller.malformed or malformed
-    if not services and cred and not caller.auth_failed:
+    if not services and cred:
         status, text = caller.call(device_url, BODY_SERVICES, auth=True)
         if status == 200:
             services, malformed = P.parse_services(text)
@@ -191,7 +193,7 @@ def scan_device(entry, cred_resolver, timeout=5.0):
             rec["findings"].append(_finding(
                 "UNAUTH_INFO_DISCLOSURE", "warn",
                 "GetDeviceInformation answered without authentication (loose/legacy firmware)"))
-    if info is None and cred and not caller.auth_failed:
+    if info is None and cred:
         status, text = caller.call(device_url, BODY_DEVINFO, auth=True)
         if status == 200:
             info, malformed = P.parse_device_info(text)
@@ -199,7 +201,7 @@ def scan_device(entry, cred_resolver, timeout=5.0):
     rec["device_info"] = info
 
     # B4: hostname / network interfaces when the auth state allows a try
-    may_try = (cred and not caller.auth_failed) or info is not None
+    may_try = cred or info is not None
     if may_try:
         status, text = caller.call(device_url, BODY_HOSTNAME, auth=bool(cred))
         if status == 200:
@@ -221,10 +223,8 @@ def scan_device(entry, cred_resolver, timeout=5.0):
         svc = services.get(key)
         if not svc:
             continue
-        use_auth = bool(cred) and not caller.auth_failed
+        use_auth = bool(cred)
         status, text = caller.call(svc, body, auth=use_auth)
-        if status != 200 and not use_auth and cred and not caller.auth_failed:
-            status, text = caller.call(svc, body, auth=True)
         if status == 200:
             found, malformed = P.parse_profiles(text, gen)
             caller.malformed = caller.malformed or malformed
@@ -235,7 +235,7 @@ def scan_device(entry, cred_resolver, timeout=5.0):
     svc_by_gen = {1: services.get("media"), 2: services.get("media2")}
     for prof in profiles[:8]:
         svc = svc_by_gen.get(prof["media_gen"])
-        if not svc or caller.auth_failed:
+        if not svc:
             continue
         ns, tag = (TRT, "trt") if prof["media_gen"] == 1 else (TR2, "tr2")
         use_auth = bool(cred)
@@ -250,8 +250,9 @@ def scan_device(entry, cred_resolver, timeout=5.0):
             if uri:
                 prof["snapshot_uri"] = P.redact_uri(uri)
     rec["profiles"] = profiles
-    sources = {p["source_token"] for p in profiles if p["source_token"]}
+    sources = {p["video_source_token"] for p in profiles if p["video_source_token"]}
     rec["channel_count"] = len(sources) if sources else len(profiles)
+    rec["channel_count_basis"] = "video_source" if sources else "profiles"
 
     # B6: PTZ presence (judgement only — no PTZ service calls beyond caps)
     ptz_evidence = []
@@ -264,10 +265,10 @@ def scan_device(entry, cred_resolver, timeout=5.0):
 
     # auth result rollup
     if cred:
-        if caller.auth_ok:
-            rec["auth"]["result"] = "ok"
-        elif caller.auth_failed:
+        if caller.auth_failed:
             rec["auth"]["result"] = "failed"
+        elif caller.auth_ok:
+            rec["auth"]["result"] = "ok"
     else:
         rec["auth"]["result"] = "not_required" if info else "not_tried"
 

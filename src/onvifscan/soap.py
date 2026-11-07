@@ -2,9 +2,8 @@
 
 Authentication rules enforced here and in scan.py:
 - credentials are only ever the ones the user explicitly supplied;
-- one attempt per device per operation class: a NotAuthorized fault ends
-  credentialed retries for that device (some vendors lock accounts after
-  repeated failures);
+- one supplied credential per device: NotAuthorized or bare HTTP 401 on a
+  credentialed request ends all further credentialed calls;
 - the password never leaves this module: callers get status + body only.
 """
 import base64
@@ -77,5 +76,7 @@ def fault_kind(text):
     if "NotAuthorized" in text:
         return "NotAuthorized"
     if is_fault(text):
+        if "ActionNotSupported" in text or "OptionalActionNotImplemented" in text:
+            return "NotSupported"
         return "Fault"
     return None
