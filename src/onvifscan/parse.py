@@ -110,22 +110,56 @@ _NS_TO_KEY = {"ver10/media": "media", "ver20/media": "media2",
 
 
 def parse_services(xml):
-    """{service_key: xaddr} from a GetServices response."""
+    """Return (routing dict, full declarations | None, malformed).
+
+    Routes retain the first known XAddr per service class. Declarations retain
+    every Service in response order, including unknown/duplicate/incomplete
+    entries. None means no usable GetServices response; [] means success empty.
+    Version components come only from Version, never from a namespace URI.
+    """
     root, malformed = safe_parse(xml)
     services = {}
     if root is None:
-        return services, malformed
-    for el in root.iter():
+        return services, None, malformed
+    response = next((el for el in root.iter() if local(el) == "GetServicesResponse"), None)
+    if response is None:
+        return services, None, True
+    declared = []
+    for el in response:
         if local(el) != "Service":
             continue
-        ns = first_text(el, "Namespace") or ""
-        xaddr = first_text(el, "XAddr")
-        if not xaddr:
-            continue
-        for frag, key in _NS_TO_KEY.items():
-            if frag in ns and key not in services:
-                services[key] = xaddr
-    return services, malformed
+        fields = {local(child): child for child in el}
+        ns = first_text(fields["Namespace"], "Namespace") if "Namespace" in fields else None
+        xaddr = first_text(fields["XAddr"], "XAddr") if "XAddr" in fields else None
+        missing = [key for key, value in (("namespace", ns), ("xaddr", xaddr)) if value is None]
+        invalid = []
+        version = fields.get("Version")
+        values = {local(child): (child.text or "").strip() for child in version} if version is not None else {}
+        parsed_version = {}
+        for key in ("Major", "Minor"):
+            raw = values.get(key)
+            value = None
+            field = "version." + key.lower()
+            if not raw:
+                missing.append(field)
+            else:
+                try:
+                    value = int(raw)
+                    if value < 0:
+                        raise ValueError
+                except ValueError:
+                    invalid.append(field)
+                    malformed = True
+                    value = None
+            parsed_version[key.lower()] = value
+        declared.append({"namespace": ns, "xaddr": redact_uri(xaddr),
+                         "version": parsed_version, "missing_fields": missing,
+                         "invalid_fields": invalid})
+        if xaddr:
+            for frag, key in _NS_TO_KEY.items():
+                if frag in (ns or "") and key not in services:
+                    services[key] = xaddr
+    return services, declared, malformed
 
 
 def parse_device_info(xml):
@@ -166,12 +200,30 @@ def parse_hostname(xml):
 def _profile_from_element(el):
     p = {"token": el.get("token"), "name": first_text(el, "Name"),
          "source_token": None, "codec": None, "width": None, "height": None,
+         "video_source_token": None, "encoder_configuration_token": None,
+         "ptz_configuration_token": None, "ptz_node_token": None,
          "fps_limit": None, "bitrate_limit_kbps": None, "ptz_config": False}
+    # Media1 has direct *Configuration children; Media2 uses Configurations.
+    # Keep accepting the old Media1-shaped Media2 responses as well.
+    configs = list(el)
+    for child in el:
+        if local(child) == "Configurations":
+            configs.extend(child)
+    for sub in configs:
+        name = local(sub)
+        if name in ("VideoSourceConfiguration", "VideoSource"):
+            # Schema 1 compatibility: source_token is the configuration token.
+            p["source_token"] = sub.get("token")
+            p["video_source_token"] = sub.get("SourceToken") or first_text(sub, "SourceToken")
+        elif name in ("VideoEncoderConfiguration", "VideoEncoder"):
+            p["encoder_configuration_token"] = sub.get("token")
+        elif name in ("PTZConfiguration", "PTZ"):
+            p["ptz_config"] = True
+            p["ptz_configuration_token"] = sub.get("token")
+            p["ptz_node_token"] = first_text(sub, "NodeToken")
     for sub in el.iter():
         name = local(sub)
-        if name == "VideoSourceConfiguration" and p["source_token"] is None:
-            p["source_token"] = sub.get("token")
-        elif name == "Encoding" and p["codec"] is None:
+        if name == "Encoding" and p["codec"] is None:
             p["codec"] = (sub.text or "").strip() or None
         elif name == "Width":
             try:
@@ -193,8 +245,6 @@ def _profile_from_element(el):
                 p["bitrate_limit_kbps"] = int(float(sub.text))
             except (TypeError, ValueError):
                 pass
-        elif name == "PTZConfiguration":
-            p["ptz_config"] = True
     return p
 
 

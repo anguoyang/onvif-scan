@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — v0.2 step 0–1
+
+- Stop all credentialed calls after a credential rejection, including bare
+  HTTP 401; a later rejection takes precedence over earlier auth success.
+- Parse actual Media2 Configurations and retain source, encoder and PTZ
+  configuration tokens plus PTZ NodeToken.
+- Schema remains 1 (the existing JSON `schema` field). `source_token` still
+  means the source **configuration** token; additive `video_source_token`
+  holds the actual SourceToken (attribute or child element). `channel_count`
+  now deduplicates actual source tokens when available, otherwise counts
+  Profiles; additive `channel_count_basis` is `video_source` or `profiles`.
+
+- Query GetServices even when capabilities are available. Add `services_declared`
+  to device records and HTML: every declared namespace/XAddr/version, including
+  unknown services, duplicates and missing/invalid fields. A failed or unparsed
+  query yields null; a successful empty response yields []. Capability routes
+  retain priority and declarations fill only missing service classes.
+- Add `service_sources` for selected routes, distinguishing GetCapabilities,
+  GetServices, the device URL and conventional paths. PTZ evidence uses
+  `service_xaddr` when its endpoint comes only from GetServices.
+
 ## v0.1.0 — 2026-11-02
 
 First release.
