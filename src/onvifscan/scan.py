@@ -122,7 +122,7 @@ def scan_device(entry, cred_resolver, timeout=5.0):
         "scopes": scopes, "device_info": None, "hostname": None,
         "mac": scopes.get("mac"), "mac_source": "scopes" if scopes.get("mac") else None,
         "ipv4": None, "clock": {"device_time": None, "offset_s": None, "skew": False},
-        "services": {}, "profiles": [], "channel_count": 0,
+        "services": {}, "services_declared": None, "profiles": [], "channel_count": 0,
         "channel_count_basis": "profiles",
         "ptz": {"present": False, "evidence": None},
         "auth": {"mode": "none", "username": None, "result": "not_tried"},
@@ -170,18 +170,23 @@ def scan_device(entry, cred_resolver, timeout=5.0):
         if status == 200:
             services, malformed = P.parse_capabilities(text)
             caller.malformed = caller.malformed or malformed
-    if not services and cred:
-        status, text = caller.call(device_url, BODY_SERVICES, auth=True)
-        if status == 200:
-            services, malformed = P.parse_services(text)
-            caller.malformed = caller.malformed or malformed
+    # A normal inventory step, independent of capabilities. With credentials
+    # use them once; without credentials make one anonymous request.
+    status, text = caller.call(device_url, BODY_SERVICES, auth=bool(cred))
+    if status == 200 and not is_fault(text):
+        routes, declared, malformed = P.parse_services(text)
+        rec["services_declared"] = declared
+        caller.malformed = caller.malformed or malformed
+        # Preserve capability routes; declarations only fill missing classes.
+        for key, xaddr in routes.items():
+            services.setdefault(key, xaddr)
     base = "%s://%s" % (urlparse(device_url).scheme, urlparse(device_url).netloc)
     if not services:
         services = {"device": device_url, "media": base + "/onvif/Media"}
         rec["findings"].append(_finding(
             "CAPS_FALLBACK", "info",
             "no capabilities/services response; conventional service paths assumed"))
-    rec["services"] = services
+    rec["services"] = {key: P.redact_uri(xaddr) for key, xaddr in services.items()}
 
     # B3: device information — one unauthenticated attempt, one credentialed
     info = None

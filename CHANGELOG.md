@@ -12,6 +12,12 @@
   now deduplicates actual source tokens when available, otherwise counts
   Profiles; additive `channel_count_basis` is `video_source` or `profiles`.
 
+- Query GetServices even when capabilities are available. Add `services_declared`
+  to device records and HTML: every declared namespace/XAddr/version, including
+  unknown services, duplicates and missing/invalid fields. A failed or unparsed
+  query yields null; a successful empty response yields []. Capability routes
+  retain priority and declarations fill only missing service classes.
+
 ## v0.1.0 — 2026-11-02
 
 First release.

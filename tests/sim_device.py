@@ -43,7 +43,7 @@ PERSONAS = {
         port=18082, disc_port=37022, manufacturer="OldBrand (sim)", model="OC-10",
         firmware="0.9.8 (sim)", serial="SIMLEG0002", hardware="OC-10",
         clock_offset_s=3, auth_devinfo=False, auth_caps=False, ptz=False, media2=False,
-        stream_uri_with_creds=False,
+        stream_uri_with_creds=False, source_tokens=False,
         scopes="onvif://www.onvif.org/Profile/Streaming",
         profiles=[("Profile_1", "H264", 2560, 1440, 20, False)],
     ),
@@ -145,14 +145,26 @@ def handle_soap(p, path, raw):
             '</tds:Capabilities></tds:GetCapabilitiesResponse>'
             % (TDS, TT, base, media, ptz, m2))
     if "GetServices" in text:
-        if not check_auth(p, root):
+        if p.get("auth_services", True) and not check_auth(p, root):
             return 401, fault()
+        media_ns = "http://www.onvif.org/ver%s/media/wsdl" % ("20" if p["media2"] else "10")
+        declarations = [(TDS, "/onvif/device_service"),
+                        (media_ns, "/onvif/media2" if p["media2"] else "/onvif/Media")]
+        if p["ptz"]:
+            declarations.append(("http://www.onvif.org/ver20/ptz/wsdl", "/onvif/PTZ"))
+        if not p["media2"] and p["ptz"]:
+            declarations.extend([
+                ("http://www.onvif.org/ver10/events/wsdl", "/onvif/Events"),
+                ("urn:fictional:sim:extra", "/onvif/Extra"),
+                (media_ns, "/onvif/MediaAlternate")])
+        version = ("<tds:Version><tt:Major>2</tt:Major><tt:Minor>6</tt:Minor>"
+                   "</tds:Version>") if p["ptz"] else ""
+        services = "".join(
+            '<tds:Service><tds:Namespace>%s</tds:Namespace><tds:XAddr>%s%s</tds:XAddr>'
+            '%s</tds:Service>' % (ns, base, path, version) for ns, path in declarations)
         return 200, envelope(
-            '<tds:GetServicesResponse xmlns:tds="%s">'
-            '<tds:Service><tds:Namespace>%s</tds:Namespace><tds:XAddr>%s/onvif/device_service</tds:XAddr></tds:Service>'
-            '<tds:Service><tds:Namespace>http://www.onvif.org/ver10/media/wsdl</tds:Namespace>'
-            '<tds:XAddr>%s/onvif/Media</tds:XAddr></tds:Service></tds:GetServicesResponse>'
-            % (TDS, TDS, base, base))
+            '<tds:GetServicesResponse xmlns:tds="%s" xmlns:tt="%s">%s</tds:GetServicesResponse>'
+            % (TDS, TT, services))
     if "GetDeviceInformation" in text:
         if p["auth_devinfo"] and not check_auth(p, root):
             return 401, fault()
@@ -204,7 +216,7 @@ def handle_soap(p, path, raw):
             profs = profs.replace('</Profiles>', '</tr2:Configurations></tr2:Profiles>')
             profs = profs.replace('<Profiles ', '<tr2:Profiles ')
         # Legacy retains its v0.1 response shape, including missing SourceToken.
-        if p.get("source_tokens", not p["manufacturer"].startswith("OldBrand")):
+        if p.get("source_tokens", True):
             profs = profs.replace('<tt:Name>VS</tt:Name>',
                                   '<tt:Name>VS</tt:Name><tt:SourceToken>Sensor_1</tt:SourceToken>')
         tag = "tr2" if gen2 else "trt"
