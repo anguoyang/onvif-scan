@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — v0.2 steps 2–4
+
+- Add per-profile source configuration names and provenance to JSON/HTML;
+  show actual source tokens alongside the legacy configuration tokens.
+- Collect Media1 encoder options for every profile with an encoder token,
+  preserving declaration ranges, per-codec resolutions and profiles. Parse
+  Media2 fractional frame-rate lists; Media2 options requests remain explicitly
+  `unqueried` because frozen D1's wrapper conflicts with the official WSDL type.
+- Query PTZ GetNodes, supplement missing/incomplete nodes with GetNode once
+  per token, and query GetPresets per associated profile. Keep node capacity
+  separate from actual preset counts/names; never export preset coordinates
+  or sum counts across profiles sharing a node.
+- Add explicit optional-query states (`ok`, `unsupported`, `auth_blocked`,
+  `failed`, `unqueried`) with null data for unknown results. Reuse the credential
+  gate and report scrub/escaping; schema remains 1. See
+  [capability field contract](docs/v0.2-capabilities.md) for fields and D1 evidence.
+
 ## Unreleased — v0.2 step 0–1
 
 - Stop all credentialed calls after a credential rejection, including bare

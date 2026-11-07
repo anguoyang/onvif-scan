@@ -14,6 +14,10 @@ onvifscan scan --user onvif_user
 每个 Profile 的编码/分辨率/帧率、PTZ 有无、时钟健康度，以及脱敏后的 RTSP
 流地址（可直接交给流验收工具）。
 
+v0.2 增加 Profile 可见源关联、Media1 编码器 options 声明、PTZ 节点声明及
+预置位数量/名称。Media2 options 请求因 D1 规格冲突显式标为未查询。
+字段与限制见 [能力字段说明](docs/v0.2-capabilities.md)。
+
 ## 它解决什么
 
 交付与运维摄像头车队时，总要反复回答这些无聊但昂贵的问题：这个网里到底
