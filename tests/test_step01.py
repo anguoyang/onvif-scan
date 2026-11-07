@@ -56,7 +56,8 @@ class TestScanHTTP(unittest.TestCase):
         self.assertFalse(any(c["credentialed"] for c in calls[rejected + 1:]), calls)
         allowed = {"GetSystemDateAndTime", "GetCapabilities", "GetServices",
                    "GetDeviceInformation", "GetHostname", "GetNetworkInterfaces",
-                   "GetProfiles", "GetStreamUri", "GetSnapshotUri"}
+                   "GetProfiles", "GetStreamUri", "GetSnapshotUri",
+                   "GetVideoEncoderConfigurationOptions", "GetNodes", "GetNode", "GetPresets"}
         self.assertTrue(all(c["operation"] in allowed for c in calls))
 
     def test_caller_gate_blocks_even_direct_call_after_rejection(self):

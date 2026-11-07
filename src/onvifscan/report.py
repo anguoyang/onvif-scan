@@ -103,6 +103,19 @@ def render_html(report):
                 _esc(p.get("source_name_origin")), _esc(p.get("codec")),
                 _esc(p.get("width")), _esc(p.get("height")), _esc(p.get("fps_limit")),
                 _esc(p.get("stream_uri"))) for p in d["profiles"])
+        profile_details = ""
+        for p in d["profiles"]:
+            options = p.get("encoder_options", {})
+            profile_details += "<h4>Profile %s (Media%s)</h4><p>Encoder options: %s · %s</p>" % (
+                _esc(p.get("token")), _esc(p.get("media_gen")),
+                _esc(options.get("status", "unqueried")), _esc(options.get("reason")))
+            if options.get("data") is not None:
+                profile_details += ("<p>Device declarations only; arbitrary combinations of encoding, "
+                                    "resolution and frame rate are not guaranteed.</p>")
+                for declaration in options["data"]["declarations"]:
+                    profile_details += "<dl>%s</dl>" % "".join(
+                        "<dt>%s</dt><dd>%s</dd>" % (_esc(key), _esc(json.dumps(value, ensure_ascii=False)))
+                        for key, value in declaration.items())
         declared = d.get("services_declared")
         if declared is None:
             service_html = "<p>Services declared: not obtained</p>"
@@ -133,7 +146,7 @@ def render_html(report):
                 _esc(d["level"]), _esc(d.get("mac")), _esc(d.get("mac_source")),
                 _esc(d["clock"].get("offset_s")), _esc(d["auth"]["mode"]),
                 _esc(d["auth"]["result"]), _esc(info.get("SerialNumber")),
-                service_html,
+                service_html + profile_details,
                 ("<p>Profile-visible sources only; configuration names are not physical source names. "
                  "Legacy channel count basis: %s.</p>"
                  "<table><tr><th>profile</th><th>source token</th><th>source configuration token</th>"

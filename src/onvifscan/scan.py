@@ -12,6 +12,7 @@ Credential discipline: one user-supplied credential per device, with no
 credentialed calls after rejection (NotAuthorized or bare HTTP 401).
 """
 import ipaddress
+from xml.sax.saxutils import escape
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -40,12 +41,19 @@ def _stream_uri_body(token, ns, tag):
             '<tt:Transport xmlns:tt="http://www.onvif.org/ver10/schema">'
             '<tt:Protocol>RTSP</tt:Protocol></tt:Transport></{t}:StreamSetup>'
             '<{t}:ProfileToken>{tok}</{t}:ProfileToken></{t}:GetStreamUri>'
-            ).format(t=tag, ns=ns, tok=token)
+            ).format(t=tag, ns=ns, tok=escape(token))
 
 
 def _snapshot_uri_body(token, ns, tag):
     return ('<{t}:GetSnapshotUri xmlns:{t}="{ns}"><{t}:ProfileToken>{tok}'
-            '</{t}:ProfileToken></{t}:GetSnapshotUri>').format(t=tag, ns=ns, tok=token)
+            '</{t}:ProfileToken></{t}:GetSnapshotUri>').format(t=tag, ns=ns, tok=escape(token))
+
+
+def _encoder_options_body(token):
+    # Media2 request is deliberately held at the D1 specification conflict.
+    return ('<trt:GetVideoEncoderConfigurationOptions xmlns:trt="%s">'
+            '<trt:ConfigurationToken>%s</trt:ConfigurationToken>'
+            '</trt:GetVideoEncoderConfigurationOptions>') % (TRT, escape(token))
 
 
 def _swap_host(url, new_host):
@@ -86,6 +94,21 @@ class _Caller:
             elif fault_kind(text) == "NotAuthorized" or (status == 401 and not is_fault(text)):
                 self.auth_failed = True
         return status, text
+
+    def query(self, url, body, parser):
+        """Status-bearing optional Get query through the same credential gate."""
+        status, text = self.call(url, body, auth=bool(self.cred))
+        if self.auth_failed or status == 401 or fault_kind(text) == "NotAuthorized":
+            return {"status": "auth_blocked", "reason": "authentication rejected or blocked",
+                    "data": None}
+        if fault_kind(text) == "NotSupported":
+            return {"status": "unsupported", "reason": "operation not supported", "data": None}
+        if status != 200 or is_fault(text):
+            return {"status": "failed", "reason": "request failed", "data": None}
+        data, malformed = parser(text)
+        self.malformed = self.malformed or malformed
+        return {"status": "ok" if data is not None else "failed",
+                "reason": None if data is not None else "unusable response", "data": data}
 
 
 def _finding(code, severity, detail):
@@ -242,6 +265,19 @@ def scan_device(entry, cred_resolver, timeout=5.0):
             if found:
                 gens_seen.add(gen)
                 profiles.extend(found)
+    # Options have no silent profile limit, including shared encoder tokens.
+    svc_by_gen = {1: services.get("media"), 2: services.get("media2")}
+    for prof in profiles:
+        token = prof["encoder_configuration_token"]
+        result = {"status": "unqueried", "reason": "missing encoder configuration token", "data": None}
+        if caller.auth_failed:
+            result.update(status="auth_blocked", reason="authentication gate closed")
+        elif prof["media_gen"] == 2:
+            result["reason"] = "D1 conflict: GetConfiguration is a WSDL type, not a wrapper element"
+        elif token:
+            result = caller.query(svc_by_gen[prof["media_gen"]], _encoder_options_body(token),
+                                  lambda xml: P.parse_encoder_options(xml, 1))
+        prof["encoder_options"] = result
     # stream + snapshot URIs per profile (bounded)
     svc_by_gen = {1: services.get("media"), 2: services.get("media2")}
     for prof in profiles[:8]:

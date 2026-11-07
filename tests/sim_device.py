@@ -103,6 +103,30 @@ def envelope(body):
             '<s:Body>%s</s:Body></s:Envelope>' % body)
 
 
+def encoder_options_response(media2=False):
+    ns = "http://www.onvif.org/ver%s/media/wsdl" % ("20" if media2 else "10")
+    resolution = ('<tt:ResolutionsAvailable><tt:Width>1920</tt:Width><tt:Height>1080</tt:Height>'
+                  '</tt:ResolutionsAvailable><tt:ResolutionsAvailable><tt:Width>640</tt:Width>'
+                  '<tt:Height>480</tt:Height></tt:ResolutionsAvailable>')
+    bitrate = '<tt:BitrateRange><tt:Min>64</tt:Min><tt:Max>8192</tt:Max></tt:BitrateRange>'
+    if media2:
+        options = ''.join('<m:Options FrameRatesSupported="1 15 29.97 59.94" '
+                          'GovLengthRange="1 120" ProfilesSupported="Main High">'
+                          '<tt:Encoding>%s</tt:Encoding>%s%s</m:Options>'
+                          % (codec, resolution, bitrate) for codec in ('H264', 'H265'))
+    else:
+        codec_options = ('%s<tt:FrameRateRange><tt:Min>1</tt:Min><tt:Max>30</tt:Max>'
+                         '</tt:FrameRateRange><tt:GovLengthRange><tt:Min>1</tt:Min>'
+                         '<tt:Max>120</tt:Max></tt:GovLengthRange>'
+                         '<tt:H264ProfilesSupported>Main</tt:H264ProfilesSupported>' % resolution)
+        options = ('<m:Options><tt:QualityRange><tt:Min>1</tt:Min><tt:Max>6</tt:Max>'
+                   '</tt:QualityRange><tt:JPEG>%s</tt:JPEG><tt:H264>%s</tt:H264>'
+                   '<tt:Extension><tt:H264>%s%s</tt:H264></tt:Extension></m:Options>'
+                   % (resolution, codec_options, codec_options, bitrate))
+    return envelope('<m:GetVideoEncoderConfigurationOptionsResponse xmlns:m="%s" xmlns:tt="%s">'
+                    '%s</m:GetVideoEncoderConfigurationOptionsResponse>' % (ns, TT, options))
+
+
 def handle_soap(p, path, raw):
     try:
         root = ET.fromstring(raw)
@@ -192,6 +216,20 @@ def handle_soap(p, path, raw):
             '<tt:Config><tt:Manual><tt:Address>127.0.0.1</tt:Address><tt:PrefixLength>8</tt:PrefixLength>'
             '</tt:Manual><tt:DHCP>false</tt:DHCP></tt:Config></tt:IPv4></tds:NetworkInterfaces>'
             '</tds:GetNetworkInterfacesResponse>' % (TDS, TT, mac))
+    if op == "GetVideoEncoderConfigurationOptions":
+        # D1 conflict: do not implement a Media2 request contract until resolved.
+        if p["media2"]:
+            return 400, fault("D1 request contract pending", "ActionNotSupported")
+        ns = "http://www.onvif.org/ver10/media/wsdl"
+        request = list(body)[0]
+        children = list(request)
+        if (operation != "{%s}%s" % (ns, op) or path != "/onvif/Media"
+                or len(children) != 1 or children[0].tag != "{%s}ConfigurationToken" % ns
+                or children[0].text != p.get("encoder_token", "VE_1")):
+            return 400, fault("invalid options request", "InvalidArgVal")
+        if not check_auth(p, root):
+            return 401, fault()
+        return 200, encoder_options_response()
     if "GetProfiles" in text:
         if not check_auth(p, root):
             return 401, fault()
