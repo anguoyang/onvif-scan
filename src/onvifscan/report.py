@@ -96,8 +96,11 @@ def render_html(report):
                                            p0.get("height") or "") if p0 else "—"),
                         "yes" if d["ptz"]["present"] else "no", _esc(d["level"])))
         prof_rows = "".join(
-            "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s×%s</td><td>%s</td><td>%s</td></tr>" % (
-                _esc(p["token"]), _esc(p.get("source_token")), _esc(p.get("codec")),
+            "<tr><td>%s (Media%s)</td><td>%s</td><td>%s</td><td>%s (%s)</td>"
+            "<td>%s</td><td>%s×%s</td><td>%s</td><td>%s</td></tr>" % (
+                _esc(p["token"]), _esc(p.get("media_gen")), _esc(p.get("video_source_token")),
+                _esc(p.get("source_token")), _esc(p.get("source_configuration_name")),
+                _esc(p.get("source_name_origin")), _esc(p.get("codec")),
                 _esc(p.get("width")), _esc(p.get("height")), _esc(p.get("fps_limit")),
                 _esc(p.get("stream_uri"))) for p in d["profiles"])
         declared = d.get("services_declared")
@@ -131,8 +134,12 @@ def render_html(report):
                 _esc(d["clock"].get("offset_s")), _esc(d["auth"]["mode"]),
                 _esc(d["auth"]["result"]), _esc(info.get("SerialNumber")),
                 service_html,
-                ("<table><tr><th>profile</th><th>source</th><th>codec</th><th>size</th>"
-                 "<th>fps</th><th>stream (password masked)</th></tr>%s</table>" % prof_rows)
+                ("<p>Profile-visible sources only; configuration names are not physical source names. "
+                 "Legacy channel count basis: %s.</p>"
+                 "<table><tr><th>profile</th><th>source token</th><th>source configuration token</th>"
+                 "<th>configuration name (origin)</th><th>codec</th><th>size</th>"
+                 "<th>fps</th><th>stream (password masked)</th></tr>%s</table>" %
+                 (_esc(d.get("channel_count_basis")), prof_rows))
                 if prof_rows else "",
                 ("<ul>%s</ul>" % find_items) if find_items else "",
                 ("<p>Next step (stream acceptance):</p><ul>%s</ul>" % steps) if steps else ""))

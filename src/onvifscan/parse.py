@@ -201,6 +201,7 @@ def _profile_from_element(el):
     p = {"token": el.get("token"), "name": first_text(el, "Name"),
          "source_token": None, "codec": None, "width": None, "height": None,
          "video_source_token": None, "encoder_configuration_token": None,
+         "source_configuration_name": None, "source_name_origin": None,
          "ptz_configuration_token": None, "ptz_node_token": None,
          "fps_limit": None, "bitrate_limit_kbps": None, "ptz_config": False}
     # Media1 has direct *Configuration children; Media2 uses Configurations.
@@ -215,6 +216,9 @@ def _profile_from_element(el):
             # Schema 1 compatibility: source_token is the configuration token.
             p["source_token"] = sub.get("token")
             p["video_source_token"] = sub.get("SourceToken") or first_text(sub, "SourceToken")
+            p["source_configuration_name"] = first_text(sub, "Name")
+            if p["source_configuration_name"] is not None:
+                p["source_name_origin"] = "VideoSourceConfiguration.Name"
         elif name in ("VideoEncoderConfiguration", "VideoEncoder"):
             p["encoder_configuration_token"] = sub.get("token")
         elif name in ("PTZConfiguration", "PTZ"):
