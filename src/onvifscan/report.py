@@ -113,9 +113,13 @@ def render_html(report):
                     _esc(service.get("version", {}).get("minor")),
                     _esc(", ".join(service.get("missing_fields", []))),
                     _esc(", ".join(service.get("invalid_fields", [])))) for service in declared)
-            service_html = ("<h4>Services declared</h4><table><tr><th>Namespace</th>"
+            service_html = ("<h4>Services declared (GetServices)</h4><table><tr><th>Namespace</th>"
                             "<th>XAddr</th><th>Version</th><th>Missing fields</th>"
                             "<th>Invalid fields</th></tr>%s</table>" % service_rows)
+        if d.get("service_sources"):
+            service_html += "<p>Selected route sources: %s</p>" % _esc(
+                ", ".join("%s: %s" % (key, source)
+                          for key, source in d["service_sources"].items()))
         find_items = "".join("<li><b>%s</b> (%s) — %s</li>" % (
             _esc(f["code"]), _esc(f["severity"]), _esc(f["detail"])) for f in d["findings"])
         steps = "".join("<li><code>%s</code></li>" % _esc(x) for x in d["next_steps"])

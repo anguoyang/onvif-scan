@@ -161,6 +161,8 @@ class TestScanHTTP(unittest.TestCase):
         self.assertIn("urn:fictional:sim:extra", [s["namespace"] for s in rec["services_declared"]])
         self.assertTrue(rec["services"]["media"].endswith("/onvif/Media"))
         self.assertIn("events", rec["services"])
+        self.assertEqual(rec["service_sources"]["media"], "GetCapabilities")
+        self.assertEqual(rec["service_sources"]["events"], "GetServices")
         self.assertEqual(rec["services_declared"][0]["version"], {"major": 2, "minor": 6})
 
     def test_strict_services_do_not_invent_media1(self):
@@ -237,6 +239,58 @@ class TestScanHTTP(unittest.TestCase):
         self.assertEqual(rec["services_declared"][0]["xaddr"],
                          "http://fixture:***@192.0.2.1/alternate")
         self.assertNotIn("uri-secret", str(rec))
+
+    def test_route_sources_distinguish_declarations_and_assumed_paths(self):
+        unavailable = (400, fault("unsupported", "ActionNotSupported"))
+        for services_available in (True, False):
+            with self.subTest(services_available=services_available):
+                responses = {"GetCapabilities": unavailable}
+                if not services_available:
+                    responses["GetServices"] = unavailable
+                _, entry = self.start_sim(responses=responses)
+                rec = self.scan(entry)
+                self.assertEqual(rec["level"], "FULL")
+                self.assertEqual(set(rec["service_sources"]), set(rec["services"]))
+                if services_available:
+                    self.assertEqual(set(rec["service_sources"].values()), {"GetServices"})
+                    self.assertIn("service_xaddr", rec["ptz"]["evidence"])
+                    self.assertNotIn("capability_xaddr", rec["ptz"]["evidence"])
+                else:
+                    self.assertIsNone(rec["services_declared"])
+                    self.assertEqual(rec["service_sources"],
+                                     {"device": "device_url", "media": "conventional_path"})
+
+    def test_quiet_with_services_keeps_two_lines_and_full_reports(self):
+        import contextlib
+        import io
+        import json
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from onvifscan.cli import main
+        _, entry = self.start_sim()
+        with tempfile.TemporaryDirectory() as directory:
+            json_path = Path(directory) / "inventory.json"
+            html_path = Path(directory) / "inventory.html"
+            output = io.StringIO()
+            with patch("onvifscan.cli.discover", return_value=([entry], {})), \
+                    contextlib.redirect_stdout(output):
+                result = main(["scan", "--quiet", "--user", USER, "--password", PASSWORD,
+                               "--json", str(json_path), "--html", str(html_path)])
+            self.assertEqual(result, 0)
+            lines = output.getvalue().splitlines()
+            self.assertEqual(len(lines), 2)
+            self.assertIn("discovered 1", lines[0])
+            self.assertEqual(lines[1], "reports: %s + %s" % (json_path, html_path))
+            saved = json_path.read_text()
+            device = json.loads(saved)["devices"][0]
+            self.assertEqual(len(device["services_declared"]), 6)
+            html = html_path.read_text()
+            self.assertIn("urn:fictional:sim:extra", html)
+            self.assertIn("Selected route sources:", html)
+            self.assertIn("media: GetCapabilities", html)
+            self.assertIn("events: GetServices", html)
+            self.assertNotIn(PASSWORD, saved + html + output.getvalue())
 
 
 class TestServicesParse(unittest.TestCase):
@@ -324,6 +378,9 @@ class TestServicesReport(unittest.TestCase):
         # HTML also masks userinfo when rendering a caller-provided record.
         report["devices"][0]["services_declared"][0]["xaddr"] = 'http://u:extra-secret@192.0.2.1/'
         self.assertNotIn("extra-secret", render_html(report))
+        device = report["devices"][0]
+        device["service_sources"] = {"<script>": "<source>"}
+        self.assertIn("&lt;script&gt;: &lt;source&gt;", render_html(report))
 
     def test_html_unknown_and_empty_are_distinct(self):
         from onvifscan.report import build_report, render_html

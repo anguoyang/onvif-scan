@@ -122,7 +122,8 @@ def scan_device(entry, cred_resolver, timeout=5.0):
         "scopes": scopes, "device_info": None, "hostname": None,
         "mac": scopes.get("mac"), "mac_source": "scopes" if scopes.get("mac") else None,
         "ipv4": None, "clock": {"device_time": None, "offset_s": None, "skew": False},
-        "services": {}, "services_declared": None, "profiles": [], "channel_count": 0,
+        "services": {}, "service_sources": {}, "services_declared": None,
+        "profiles": [], "channel_count": 0,
         "channel_count_basis": "profiles",
         "ptz": {"present": False, "evidence": None},
         "auth": {"mode": "none", "username": None, "result": "not_tried"},
@@ -170,6 +171,7 @@ def scan_device(entry, cred_resolver, timeout=5.0):
         if status == 200:
             services, malformed = P.parse_capabilities(text)
             caller.malformed = caller.malformed or malformed
+    service_sources = {key: "GetCapabilities" for key in services}
     # A normal inventory step, independent of capabilities. With credentials
     # use them once; without credentials make one anonymous request.
     status, text = caller.call(device_url, BODY_SERVICES, auth=bool(cred))
@@ -179,14 +181,18 @@ def scan_device(entry, cred_resolver, timeout=5.0):
         caller.malformed = caller.malformed or malformed
         # Preserve capability routes; declarations only fill missing classes.
         for key, xaddr in routes.items():
-            services.setdefault(key, xaddr)
+            if key not in services:
+                services[key] = xaddr
+                service_sources[key] = "GetServices"
     base = "%s://%s" % (urlparse(device_url).scheme, urlparse(device_url).netloc)
     if not services:
         services = {"device": device_url, "media": base + "/onvif/Media"}
+        service_sources = {"device": "device_url", "media": "conventional_path"}
         rec["findings"].append(_finding(
             "CAPS_FALLBACK", "info",
             "no capabilities/services response; conventional service paths assumed"))
     rec["services"] = {key: P.redact_uri(xaddr) for key, xaddr in services.items()}
+    rec["service_sources"] = service_sources
 
     # B3: device information — one unauthenticated attempt, one credentialed
     info = None
@@ -262,7 +268,8 @@ def scan_device(entry, cred_resolver, timeout=5.0):
     # B6: PTZ presence (judgement only — no PTZ service calls beyond caps)
     ptz_evidence = []
     if services.get("ptz"):
-        ptz_evidence.append("capability_xaddr")
+        ptz_evidence.append("capability_xaddr" if service_sources["ptz"] == "GetCapabilities"
+                            else "service_xaddr")
     if any(p["ptz_config"] for p in profiles):
         ptz_evidence.append("profile_config")
     rec["ptz"] = {"present": bool(ptz_evidence),

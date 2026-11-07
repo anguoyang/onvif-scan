@@ -17,6 +17,9 @@
   unknown services, duplicates and missing/invalid fields. A failed or unparsed
   query yields null; a successful empty response yields []. Capability routes
   retain priority and declarations fill only missing service classes.
+- Add `service_sources` for selected routes, distinguishing GetCapabilities,
+  GetServices, the device URL and conventional paths. PTZ evidence uses
+  `service_xaddr` when its endpoint comes only from GetServices.
 
 ## v0.1.0 — 2026-11-02
 
