@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased — v0.2 steps 2–4
+## v0.2.0 — 2026-11-08
+
+Capability inventory release. All additions are additive; JSON schema
+remains 1. Verified against the three simulated personas (86 tests:
+loopback suite plus full discovery end-to-end on a LAN host). Real-camera
+reports are still being collected; see the release notes.
 
 - Add per-profile source configuration names and provenance to JSON/HTML;
   show actual source tokens alongside the legacy configuration tokens.
@@ -18,8 +23,6 @@
   `failed`, `unqueried`) with null data for unknown results. Reuse the credential
   gate and report scrub/escaping; schema remains 1. See
   [capability field contract](docs/v0.2-capabilities.md) for fields and D1 evidence.
-
-## Unreleased — v0.2 step 0–1
 
 - Stop all credentialed calls after a credential rejection, including bare
   HTTP 401; a later rejection takes precedence over earlier auth success.

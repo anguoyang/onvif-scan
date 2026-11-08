@@ -1,19 +1,19 @@
 {
  "schema": 1,
  "kind": "onvif_inventory",
- "tool_version": "0.1.0",
- "generated_at": "2026-11-02T09:42:55+08:00",
+ "tool_version": "0.2.0",
+ "generated_at": "2026-11-08T00:07:06+00:00",
  "scan": {
   "interfaces": [
-   "lo"
+   "lo (simulated)"
   ],
   "subnets": [
-   "127.0.0.0/24"
+   "127.0.0.0/8"
   ],
-  "probe_count": 8,
-  "mode": "discovery+directed",
+  "probe_count": 3,
+  "mode": "discovery",
   "auth_mode": "single",
-  "duration_s": 5.1
+  "duration_s": 0.1
  },
  "summary": {
   "discovered": 3,
@@ -26,115 +26,11 @@
  "devices": [
   {
    "ip": "127.0.0.1",
-   "port": 18083,
-   "endpoint": "urn:uuid:5e6622b1-fb8e-4078-8199-98f6d7eaa1ef",
-   "types": "dn:NetworkVideoTransmitter tds:Device",
+   "port": 39253,
+   "endpoint": null,
+   "types": null,
    "xaddrs": [
-    "http://127.0.0.1:18083/onvif/device_service"
-   ],
-   "source_ips": [
-    "127.0.0.1"
-   ],
-   "scopes": {
-    "profiles": [
-     "Streaming",
-     "T"
-    ],
-    "name": "Sim Strict",
-    "hardware": "SE-9",
-    "mac": "aa:bb:cc:00:00:03",
-    "location": null,
-    "raw": "onvif://www.onvif.org/Profile/Streaming onvif://www.onvif.org/Profile/T onvif://www.onvif.org/name/Sim%20Strict onvif://www.onvif.org/hardware/SE-9 onvif://www.onvif.org/mac/aa:bb:cc:00:00:03"
-   },
-   "device_info": {
-    "Manufacturer": "SecureEye (sim)",
-    "Model": "SE-9",
-    "FirmwareVersion": "7.1.0 (sim)",
-    "SerialNumber": "SIMSTR0003",
-    "HardwareId": "SE-9"
-   },
-   "hostname": "simcam",
-   "mac": "aa:bb:cc:00:00:03",
-   "mac_source": "scopes",
-   "ipv4": {
-    "address": "127.0.0.1",
-    "prefix": 8
-   },
-   "clock": {
-    "device_time": "2026-11-02T02:44:58+00:00",
-    "offset_s": 3722.7,
-    "skew": true
-   },
-   "services": {
-    "device": "http://127.0.0.1:18083/onvif/device_service",
-    "ptz": "http://127.0.0.1:18083/onvif/PTZ",
-    "media2": "http://127.0.0.1:18083/onvif/media2"
-   },
-   "profiles": [
-    {
-     "token": "profile_0_h264",
-     "name": "profile_0_h264",
-     "source_token": "VS_1",
-     "codec": "H264",
-     "width": 1920,
-     "height": 1080,
-     "fps_limit": 30,
-     "bitrate_limit_kbps": 4096,
-     "ptz_config": true,
-     "media_gen": 2,
-     "stream_uri": "rtsp://127.0.0.1:554/stream1",
-     "snapshot_uri": "http://127.0.0.1:18083/snap.jpg"
-    },
-    {
-     "token": "profile_0_h265",
-     "name": "profile_0_h265",
-     "source_token": "VS_1",
-     "codec": "H265",
-     "width": 1920,
-     "height": 1080,
-     "fps_limit": 30,
-     "bitrate_limit_kbps": 4096,
-     "ptz_config": true,
-     "media_gen": 2,
-     "stream_uri": "rtsp://127.0.0.1:554/stream1",
-     "snapshot_uri": "http://127.0.0.1:18083/snap.jpg"
-    }
-   ],
-   "channel_count": 1,
-   "ptz": {
-    "present": true,
-    "evidence": "capability_xaddr+profile_config"
-   },
-   "auth": {
-    "mode": "provided",
-    "username": "onvif_user",
-    "result": "ok"
-   },
-   "level": "FULL",
-   "findings": [
-    {
-     "code": "CLOCK_SKEW",
-     "severity": "warn",
-     "detail": "device clock offset 3723s; check NTP on the device"
-    },
-    {
-     "code": "MEDIA2_ONLY",
-     "severity": "info",
-     "detail": "profiles only via Media2 (Profile T generation)"
-    }
-   ],
-   "next_steps": [
-    "rkdoctor rtsp rtsp://127.0.0.1:554/stream1",
-    "rkdoctor rtsp rtsp://127.0.0.1:554/stream1"
-   ]
-  },
-  {
-   "ip": "127.0.0.1",
-   "port": 18081,
-   "endpoint": "urn:uuid:a117c44d-68f9-4131-a0d8-b6c3d570d5c2",
-   "types": "dn:NetworkVideoTransmitter tds:Device",
-   "xaddrs": [
-    "http://127.0.0.1:18081/onvif/device_service"
+    "http://127.0.0.1:39253/onvif/device_service"
    ],
    "source_ips": [
     "127.0.0.1"
@@ -165,15 +61,84 @@
     "prefix": 8
    },
    "clock": {
-    "device_time": "2026-11-02T01:42:57+00:00",
-    "offset_s": 1.7,
+    "device_time": "2026-11-08T00:07:08+00:00",
+    "offset_s": 1.8,
     "skew": false
    },
    "services": {
-    "device": "http://127.0.0.1:18081/onvif/device_service",
-    "media": "http://127.0.0.1:18081/onvif/Media",
-    "ptz": "http://127.0.0.1:18081/onvif/PTZ"
+    "device": "http://127.0.0.1:39253/onvif/device_service",
+    "media": "http://127.0.0.1:39253/onvif/Media",
+    "ptz": "http://127.0.0.1:39253/onvif/PTZ",
+    "events": "http://127.0.0.1:39253/onvif/Events"
    },
+   "service_sources": {
+    "device": "GetCapabilities",
+    "media": "GetCapabilities",
+    "ptz": "GetCapabilities",
+    "events": "GetServices"
+   },
+   "services_declared": [
+    {
+     "namespace": "http://www.onvif.org/ver10/device/wsdl",
+     "xaddr": "http://127.0.0.1:39253/onvif/device_service",
+     "version": {
+      "major": 2,
+      "minor": 6
+     },
+     "missing_fields": [],
+     "invalid_fields": []
+    },
+    {
+     "namespace": "http://www.onvif.org/ver10/media/wsdl",
+     "xaddr": "http://127.0.0.1:39253/onvif/Media",
+     "version": {
+      "major": 2,
+      "minor": 6
+     },
+     "missing_fields": [],
+     "invalid_fields": []
+    },
+    {
+     "namespace": "http://www.onvif.org/ver20/ptz/wsdl",
+     "xaddr": "http://127.0.0.1:39253/onvif/PTZ",
+     "version": {
+      "major": 2,
+      "minor": 6
+     },
+     "missing_fields": [],
+     "invalid_fields": []
+    },
+    {
+     "namespace": "http://www.onvif.org/ver10/events/wsdl",
+     "xaddr": "http://127.0.0.1:39253/onvif/Events",
+     "version": {
+      "major": 2,
+      "minor": 6
+     },
+     "missing_fields": [],
+     "invalid_fields": []
+    },
+    {
+     "namespace": "urn:fictional:sim:extra",
+     "xaddr": "http://127.0.0.1:39253/onvif/Extra",
+     "version": {
+      "major": 2,
+      "minor": 6
+     },
+     "missing_fields": [],
+     "invalid_fields": []
+    },
+    {
+     "namespace": "http://www.onvif.org/ver10/media/wsdl",
+     "xaddr": "http://127.0.0.1:39253/onvif/MediaAlternate",
+     "version": {
+      "major": 2,
+      "minor": 6
+     },
+     "missing_fields": [],
+     "invalid_fields": []
+    }
+   ],
    "profiles": [
     {
      "token": "MainStream",
@@ -182,12 +147,146 @@
      "codec": "H264",
      "width": 1920,
      "height": 1080,
+     "video_source_token": "Sensor_1",
+     "encoder_configuration_token": "VE_1",
+     "source_configuration_name": "VS",
+     "source_name_origin": "VideoSourceConfiguration.Name",
+     "ptz_configuration_token": "PTZ_1",
+     "ptz_node_token": "PTZNode",
      "fps_limit": 25,
      "bitrate_limit_kbps": 4096,
      "ptz_config": true,
      "media_gen": 1,
      "stream_uri": "rtsp://onvif_user:***@127.0.0.1:554/stream1",
-     "snapshot_uri": "http://127.0.0.1:18081/snap.jpg"
+     "snapshot_uri": "http://127.0.0.1:39253/snap.jpg",
+     "encoder_options": {
+      "status": "ok",
+      "reason": null,
+      "data": {
+       "encodings": [
+        "JPEG",
+        "H264"
+       ],
+       "declarations": [
+        {
+         "encoding": "JPEG",
+         "origin": "Options",
+         "resolutions": [
+          {
+           "width": 1920,
+           "height": 1080
+          },
+          {
+           "width": 640,
+           "height": 480
+          }
+         ],
+         "frame_rate_range": {
+          "min": 1.0,
+          "max": 30.0
+         },
+         "frame_rates_supported": null,
+         "bitrate_range_kbps": null,
+         "gov_length_range": null,
+         "profiles_supported": null,
+         "quality_range": {
+          "min": 1.0,
+          "max": 6.0
+         },
+         "encoding_interval_range": {
+          "min": 1.0,
+          "max": 4.0
+         }
+        },
+        {
+         "encoding": "H264",
+         "origin": "Options",
+         "resolutions": [
+          {
+           "width": 1920,
+           "height": 1080
+          },
+          {
+           "width": 640,
+           "height": 480
+          }
+         ],
+         "frame_rate_range": {
+          "min": 1.0,
+          "max": 30.0
+         },
+         "frame_rates_supported": null,
+         "bitrate_range_kbps": null,
+         "gov_length_range": {
+          "min": 1.0,
+          "max": 120.0
+         },
+         "profiles_supported": [
+          "Main"
+         ],
+         "quality_range": {
+          "min": 1.0,
+          "max": 6.0
+         },
+         "encoding_interval_range": {
+          "min": 1.0,
+          "max": 4.0
+         }
+        },
+        {
+         "encoding": "H264",
+         "origin": "Options.Extension",
+         "resolutions": [
+          {
+           "width": 1920,
+           "height": 1080
+          },
+          {
+           "width": 640,
+           "height": 480
+          }
+         ],
+         "frame_rate_range": {
+          "min": 1.0,
+          "max": 30.0
+         },
+         "frame_rates_supported": null,
+         "bitrate_range_kbps": {
+          "min": 64.0,
+          "max": 8192.0
+         },
+         "gov_length_range": {
+          "min": 1.0,
+          "max": 120.0
+         },
+         "profiles_supported": [
+          "Main"
+         ],
+         "quality_range": {
+          "min": 1.0,
+          "max": 6.0
+         },
+         "encoding_interval_range": {
+          "min": 1.0,
+          "max": 4.0
+         }
+        }
+       ]
+      }
+     },
+     "ptz_node_status": "ok",
+     "ptz_node_reason": null,
+     "ptz_presets": {
+      "status": "ok",
+      "reason": null,
+      "data": {
+       "count": 2,
+       "names": [
+        "Entrance",
+        "Entrance"
+       ]
+      }
+     }
     },
     {
      "token": "SubStream",
@@ -196,18 +295,189 @@
      "codec": "H265",
      "width": 640,
      "height": 480,
+     "video_source_token": "Sensor_1",
+     "encoder_configuration_token": "VE_1",
+     "source_configuration_name": "VS",
+     "source_name_origin": "VideoSourceConfiguration.Name",
+     "ptz_configuration_token": null,
+     "ptz_node_token": null,
      "fps_limit": 15,
      "bitrate_limit_kbps": 4096,
      "ptz_config": false,
      "media_gen": 1,
      "stream_uri": "rtsp://onvif_user:***@127.0.0.1:554/stream1",
-     "snapshot_uri": "http://127.0.0.1:18081/snap.jpg"
+     "snapshot_uri": "http://127.0.0.1:39253/snap.jpg",
+     "encoder_options": {
+      "status": "ok",
+      "reason": null,
+      "data": {
+       "encodings": [
+        "JPEG",
+        "H264"
+       ],
+       "declarations": [
+        {
+         "encoding": "JPEG",
+         "origin": "Options",
+         "resolutions": [
+          {
+           "width": 1920,
+           "height": 1080
+          },
+          {
+           "width": 640,
+           "height": 480
+          }
+         ],
+         "frame_rate_range": {
+          "min": 1.0,
+          "max": 30.0
+         },
+         "frame_rates_supported": null,
+         "bitrate_range_kbps": null,
+         "gov_length_range": null,
+         "profiles_supported": null,
+         "quality_range": {
+          "min": 1.0,
+          "max": 6.0
+         },
+         "encoding_interval_range": {
+          "min": 1.0,
+          "max": 4.0
+         }
+        },
+        {
+         "encoding": "H264",
+         "origin": "Options",
+         "resolutions": [
+          {
+           "width": 1920,
+           "height": 1080
+          },
+          {
+           "width": 640,
+           "height": 480
+          }
+         ],
+         "frame_rate_range": {
+          "min": 1.0,
+          "max": 30.0
+         },
+         "frame_rates_supported": null,
+         "bitrate_range_kbps": null,
+         "gov_length_range": {
+          "min": 1.0,
+          "max": 120.0
+         },
+         "profiles_supported": [
+          "Main"
+         ],
+         "quality_range": {
+          "min": 1.0,
+          "max": 6.0
+         },
+         "encoding_interval_range": {
+          "min": 1.0,
+          "max": 4.0
+         }
+        },
+        {
+         "encoding": "H264",
+         "origin": "Options.Extension",
+         "resolutions": [
+          {
+           "width": 1920,
+           "height": 1080
+          },
+          {
+           "width": 640,
+           "height": 480
+          }
+         ],
+         "frame_rate_range": {
+          "min": 1.0,
+          "max": 30.0
+         },
+         "frame_rates_supported": null,
+         "bitrate_range_kbps": {
+          "min": 64.0,
+          "max": 8192.0
+         },
+         "gov_length_range": {
+          "min": 1.0,
+          "max": 120.0
+         },
+         "profiles_supported": [
+          "Main"
+         ],
+         "quality_range": {
+          "min": 1.0,
+          "max": 6.0
+         },
+         "encoding_interval_range": {
+          "min": 1.0,
+          "max": 4.0
+         }
+        }
+       ]
+      }
+     },
+     "ptz_node_status": "unqueried",
+     "ptz_node_reason": "no associated NodeToken",
+     "ptz_presets": {
+      "status": "unqueried",
+      "reason": "no PTZ configuration",
+      "data": null
+     }
     }
    ],
    "channel_count": 1,
+   "channel_count_basis": "video_source",
    "ptz": {
     "present": true,
-    "evidence": "capability_xaddr+profile_config"
+    "evidence": "capability_xaddr+profile_config",
+    "nodes_status": "ok",
+    "nodes_reason": null,
+    "nodes": [
+     {
+      "token": "PTZNode",
+      "status": "ok",
+      "reason": null,
+      "source": "GetNodes",
+      "data": {
+       "token": "PTZNode",
+       "name": "Sim node",
+       "maximum_number_of_presets": 80,
+       "home_supported": true,
+       "fixed_home_position": false,
+       "supported_preset_tour": {
+        "maximum_number_of_preset_tours": 2,
+        "operations": [
+         "Start"
+        ]
+       }
+      }
+     },
+     {
+      "token": "FixedNode",
+      "status": "ok",
+      "reason": null,
+      "source": "GetNodes",
+      "data": {
+       "token": "FixedNode",
+       "name": "Sim node",
+       "maximum_number_of_presets": 0,
+       "home_supported": false,
+       "fixed_home_position": false,
+       "supported_preset_tour": {
+        "maximum_number_of_preset_tours": 0,
+        "operations": [
+         "Start"
+        ]
+       }
+      }
+     }
+    ]
    },
    "auth": {
     "mode": "provided",
@@ -234,11 +504,11 @@
   },
   {
    "ip": "127.0.0.1",
-   "port": 18082,
-   "endpoint": "urn:uuid:4f592c32-3c2f-43fe-803e-4e5e27285666",
-   "types": "dn:NetworkVideoTransmitter tds:Device",
+   "port": 38611,
+   "endpoint": null,
+   "types": null,
    "xaddrs": [
-    "http://127.0.0.1:18082/onvif/device_service"
+    "http://127.0.0.1:38611/onvif/device_service"
    ],
    "source_ips": [
     "127.0.0.1"
@@ -268,14 +538,46 @@
     "prefix": 8
    },
    "clock": {
-    "device_time": "2026-11-02T01:42:58+00:00",
-    "offset_s": 2.6,
+    "device_time": "2026-11-08T00:07:09+00:00",
+    "offset_s": 2.8,
     "skew": false
    },
    "services": {
-    "device": "http://127.0.0.1:18082/onvif/device_service",
-    "media": "http://127.0.0.1:18082/onvif/Media"
+    "device": "http://127.0.0.1:38611/onvif/device_service",
+    "media": "http://127.0.0.1:38611/onvif/Media"
    },
+   "service_sources": {
+    "device": "GetCapabilities",
+    "media": "GetCapabilities"
+   },
+   "services_declared": [
+    {
+     "namespace": "http://www.onvif.org/ver10/device/wsdl",
+     "xaddr": "http://127.0.0.1:38611/onvif/device_service",
+     "version": {
+      "major": null,
+      "minor": null
+     },
+     "missing_fields": [
+      "version.major",
+      "version.minor"
+     ],
+     "invalid_fields": []
+    },
+    {
+     "namespace": "http://www.onvif.org/ver10/media/wsdl",
+     "xaddr": "http://127.0.0.1:38611/onvif/Media",
+     "version": {
+      "major": null,
+      "minor": null
+     },
+     "missing_fields": [
+      "version.major",
+      "version.minor"
+     ],
+     "invalid_fields": []
+    }
+   ],
    "profiles": [
     {
      "token": "Profile_1",
@@ -284,18 +586,150 @@
      "codec": "H264",
      "width": 2560,
      "height": 1440,
+     "video_source_token": null,
+     "encoder_configuration_token": "VE_1",
+     "source_configuration_name": "VS",
+     "source_name_origin": "VideoSourceConfiguration.Name",
+     "ptz_configuration_token": null,
+     "ptz_node_token": null,
      "fps_limit": 20,
      "bitrate_limit_kbps": 4096,
      "ptz_config": false,
      "media_gen": 1,
      "stream_uri": "rtsp://127.0.0.1:554/stream1",
-     "snapshot_uri": "http://127.0.0.1:18082/snap.jpg"
+     "snapshot_uri": "http://127.0.0.1:38611/snap.jpg",
+     "encoder_options": {
+      "status": "ok",
+      "reason": null,
+      "data": {
+       "encodings": [
+        "JPEG",
+        "H264"
+       ],
+       "declarations": [
+        {
+         "encoding": "JPEG",
+         "origin": "Options",
+         "resolutions": [
+          {
+           "width": 1920,
+           "height": 1080
+          },
+          {
+           "width": 640,
+           "height": 480
+          }
+         ],
+         "frame_rate_range": {
+          "min": 1.0,
+          "max": 30.0
+         },
+         "frame_rates_supported": null,
+         "bitrate_range_kbps": null,
+         "gov_length_range": null,
+         "profiles_supported": null,
+         "quality_range": {
+          "min": 1.0,
+          "max": 6.0
+         },
+         "encoding_interval_range": {
+          "min": 1.0,
+          "max": 4.0
+         }
+        },
+        {
+         "encoding": "H264",
+         "origin": "Options",
+         "resolutions": [
+          {
+           "width": 1920,
+           "height": 1080
+          },
+          {
+           "width": 640,
+           "height": 480
+          }
+         ],
+         "frame_rate_range": {
+          "min": 1.0,
+          "max": 30.0
+         },
+         "frame_rates_supported": null,
+         "bitrate_range_kbps": null,
+         "gov_length_range": {
+          "min": 1.0,
+          "max": 120.0
+         },
+         "profiles_supported": [
+          "Main"
+         ],
+         "quality_range": {
+          "min": 1.0,
+          "max": 6.0
+         },
+         "encoding_interval_range": {
+          "min": 1.0,
+          "max": 4.0
+         }
+        },
+        {
+         "encoding": "H264",
+         "origin": "Options.Extension",
+         "resolutions": [
+          {
+           "width": 1920,
+           "height": 1080
+          },
+          {
+           "width": 640,
+           "height": 480
+          }
+         ],
+         "frame_rate_range": {
+          "min": 1.0,
+          "max": 30.0
+         },
+         "frame_rates_supported": null,
+         "bitrate_range_kbps": {
+          "min": 64.0,
+          "max": 8192.0
+         },
+         "gov_length_range": {
+          "min": 1.0,
+          "max": 120.0
+         },
+         "profiles_supported": [
+          "Main"
+         ],
+         "quality_range": {
+          "min": 1.0,
+          "max": 6.0
+         },
+         "encoding_interval_range": {
+          "min": 1.0,
+          "max": 4.0
+         }
+        }
+       ]
+      }
+     },
+     "ptz_node_status": "unqueried",
+     "ptz_node_reason": "no associated NodeToken",
+     "ptz_presets": {
+      "status": "unqueried",
+      "reason": "no PTZ configuration",
+      "data": null
+     }
     }
    ],
    "channel_count": 1,
+   "channel_count_basis": "profiles",
    "ptz": {
     "present": false,
-    "evidence": null
+    "evidence": null,
+    "nodes_status": "unqueried",
+    "nodes_reason": "no PTZ service route",
+    "nodes": []
    },
    "auth": {
     "mode": "provided",
@@ -331,6 +765,385 @@
     }
    ],
    "next_steps": [
+    "rkdoctor rtsp rtsp://127.0.0.1:554/stream1"
+   ]
+  },
+  {
+   "ip": "127.0.0.1",
+   "port": 41313,
+   "endpoint": null,
+   "types": null,
+   "xaddrs": [
+    "http://127.0.0.1:41313/onvif/device_service"
+   ],
+   "source_ips": [
+    "127.0.0.1"
+   ],
+   "scopes": {
+    "profiles": [
+     "Streaming",
+     "T"
+    ],
+    "name": "Sim Strict",
+    "hardware": "SE-9",
+    "mac": "aa:bb:cc:00:00:03",
+    "location": null,
+    "raw": "onvif://www.onvif.org/Profile/Streaming onvif://www.onvif.org/Profile/T onvif://www.onvif.org/name/Sim%20Strict onvif://www.onvif.org/hardware/SE-9 onvif://www.onvif.org/mac/aa:bb:cc:00:00:03"
+   },
+   "device_info": {
+    "Manufacturer": "SecureEye (sim)",
+    "Model": "SE-9",
+    "FirmwareVersion": "7.1.0 (sim)",
+    "SerialNumber": "SIMSTR0003",
+    "HardwareId": "SE-9"
+   },
+   "hostname": "simcam",
+   "mac": "aa:bb:cc:00:00:03",
+   "mac_source": "scopes",
+   "ipv4": {
+    "address": "127.0.0.1",
+    "prefix": 8
+   },
+   "clock": {
+    "device_time": "2026-11-08T01:09:09+00:00",
+    "offset_s": 3722.8,
+    "skew": true
+   },
+   "services": {
+    "device": "http://127.0.0.1:41313/onvif/device_service",
+    "ptz": "http://127.0.0.1:41313/onvif/PTZ",
+    "media2": "http://127.0.0.1:41313/onvif/media2"
+   },
+   "service_sources": {
+    "device": "GetCapabilities",
+    "ptz": "GetCapabilities",
+    "media2": "GetCapabilities"
+   },
+   "services_declared": [
+    {
+     "namespace": "http://www.onvif.org/ver10/device/wsdl",
+     "xaddr": "http://127.0.0.1:41313/onvif/device_service",
+     "version": {
+      "major": 2,
+      "minor": 6
+     },
+     "missing_fields": [],
+     "invalid_fields": []
+    },
+    {
+     "namespace": "http://www.onvif.org/ver20/media/wsdl",
+     "xaddr": "http://127.0.0.1:41313/onvif/media2",
+     "version": {
+      "major": 2,
+      "minor": 6
+     },
+     "missing_fields": [],
+     "invalid_fields": []
+    },
+    {
+     "namespace": "http://www.onvif.org/ver20/ptz/wsdl",
+     "xaddr": "http://127.0.0.1:41313/onvif/PTZ",
+     "version": {
+      "major": 2,
+      "minor": 6
+     },
+     "missing_fields": [],
+     "invalid_fields": []
+    }
+   ],
+   "profiles": [
+    {
+     "token": "profile_0_h264",
+     "name": "profile_0_h264",
+     "source_token": "VS_1",
+     "codec": "H264",
+     "width": 1920,
+     "height": 1080,
+     "video_source_token": "Sensor_1",
+     "encoder_configuration_token": "VE_1",
+     "source_configuration_name": "VS",
+     "source_name_origin": "VideoSourceConfiguration.Name",
+     "ptz_configuration_token": "PTZ_1",
+     "ptz_node_token": "PTZNode",
+     "fps_limit": 30,
+     "bitrate_limit_kbps": 4096,
+     "ptz_config": true,
+     "media_gen": 2,
+     "stream_uri": "rtsp://127.0.0.1:554/stream1",
+     "snapshot_uri": "http://127.0.0.1:41313/snap.jpg",
+     "encoder_options": {
+      "status": "ok",
+      "reason": null,
+      "data": {
+       "encodings": [
+        "H264",
+        "H265"
+       ],
+       "declarations": [
+        {
+         "encoding": "H264",
+         "origin": "Options",
+         "resolutions": [
+          {
+           "width": 1920,
+           "height": 1080
+          },
+          {
+           "width": 640,
+           "height": 480
+          }
+         ],
+         "frame_rate_range": null,
+         "frame_rates_supported": [
+          1.0,
+          15.0,
+          29.97,
+          59.94
+         ],
+         "bitrate_range_kbps": {
+          "min": 64.0,
+          "max": 8192.0
+         },
+         "gov_length_range": [
+          1,
+          120
+         ],
+         "profiles_supported": [
+          "Main",
+          "High"
+         ],
+         "quality_range": {
+          "min": 1.0,
+          "max": 6.0
+         },
+         "encoding_interval_range": null
+        },
+        {
+         "encoding": "H265",
+         "origin": "Options",
+         "resolutions": [
+          {
+           "width": 1920,
+           "height": 1080
+          },
+          {
+           "width": 640,
+           "height": 480
+          }
+         ],
+         "frame_rate_range": null,
+         "frame_rates_supported": [
+          1.0,
+          15.0,
+          29.97,
+          59.94
+         ],
+         "bitrate_range_kbps": {
+          "min": 64.0,
+          "max": 8192.0
+         },
+         "gov_length_range": [
+          1,
+          120
+         ],
+         "profiles_supported": [
+          "Main",
+          "High"
+         ],
+         "quality_range": {
+          "min": 1.0,
+          "max": 6.0
+         },
+         "encoding_interval_range": null
+        }
+       ]
+      }
+     },
+     "ptz_node_status": "ok",
+     "ptz_node_reason": null,
+     "ptz_presets": {
+      "status": "ok",
+      "reason": null,
+      "data": {
+       "count": 2,
+       "names": [
+        "Entrance",
+        "Entrance"
+       ]
+      }
+     }
+    },
+    {
+     "token": "profile_0_h265",
+     "name": "profile_0_h265",
+     "source_token": "VS_1",
+     "codec": "H265",
+     "width": 1920,
+     "height": 1080,
+     "video_source_token": "Sensor_1",
+     "encoder_configuration_token": "VE_1",
+     "source_configuration_name": "VS",
+     "source_name_origin": "VideoSourceConfiguration.Name",
+     "ptz_configuration_token": "PTZ_1",
+     "ptz_node_token": "PTZNode",
+     "fps_limit": 30,
+     "bitrate_limit_kbps": 4096,
+     "ptz_config": true,
+     "media_gen": 2,
+     "stream_uri": "rtsp://127.0.0.1:554/stream1",
+     "snapshot_uri": "http://127.0.0.1:41313/snap.jpg",
+     "encoder_options": {
+      "status": "ok",
+      "reason": null,
+      "data": {
+       "encodings": [
+        "H264",
+        "H265"
+       ],
+       "declarations": [
+        {
+         "encoding": "H264",
+         "origin": "Options",
+         "resolutions": [
+          {
+           "width": 1920,
+           "height": 1080
+          },
+          {
+           "width": 640,
+           "height": 480
+          }
+         ],
+         "frame_rate_range": null,
+         "frame_rates_supported": [
+          1.0,
+          15.0,
+          29.97,
+          59.94
+         ],
+         "bitrate_range_kbps": {
+          "min": 64.0,
+          "max": 8192.0
+         },
+         "gov_length_range": [
+          1,
+          120
+         ],
+         "profiles_supported": [
+          "Main",
+          "High"
+         ],
+         "quality_range": {
+          "min": 1.0,
+          "max": 6.0
+         },
+         "encoding_interval_range": null
+        },
+        {
+         "encoding": "H265",
+         "origin": "Options",
+         "resolutions": [
+          {
+           "width": 1920,
+           "height": 1080
+          },
+          {
+           "width": 640,
+           "height": 480
+          }
+         ],
+         "frame_rate_range": null,
+         "frame_rates_supported": [
+          1.0,
+          15.0,
+          29.97,
+          59.94
+         ],
+         "bitrate_range_kbps": {
+          "min": 64.0,
+          "max": 8192.0
+         },
+         "gov_length_range": [
+          1,
+          120
+         ],
+         "profiles_supported": [
+          "Main",
+          "High"
+         ],
+         "quality_range": {
+          "min": 1.0,
+          "max": 6.0
+         },
+         "encoding_interval_range": null
+        }
+       ]
+      }
+     },
+     "ptz_node_status": "ok",
+     "ptz_node_reason": null,
+     "ptz_presets": {
+      "status": "ok",
+      "reason": null,
+      "data": {
+       "count": 2,
+       "names": [
+        "Entrance",
+        "Entrance"
+       ]
+      }
+     }
+    }
+   ],
+   "channel_count": 1,
+   "channel_count_basis": "video_source",
+   "ptz": {
+    "present": true,
+    "evidence": "capability_xaddr+profile_config",
+    "nodes_status": "ok",
+    "nodes_reason": null,
+    "nodes": [
+     {
+      "token": "PTZNode",
+      "status": "ok",
+      "reason": null,
+      "source": "GetNodes",
+      "data": {
+       "token": "PTZNode",
+       "name": "Sim node",
+       "maximum_number_of_presets": 80,
+       "home_supported": true,
+       "fixed_home_position": false,
+       "supported_preset_tour": {
+        "maximum_number_of_preset_tours": 2,
+        "operations": [
+         "Start"
+        ]
+       }
+      }
+     }
+    ]
+   },
+   "auth": {
+    "mode": "provided",
+    "username": "onvif_user",
+    "result": "ok"
+   },
+   "level": "FULL",
+   "findings": [
+    {
+     "code": "CLOCK_SKEW",
+     "severity": "warn",
+     "detail": "device clock offset 3723s; check NTP on the device"
+    },
+    {
+     "code": "MEDIA2_ONLY",
+     "severity": "info",
+     "detail": "profiles only via Media2 (Profile T generation)"
+    }
+   ],
+   "next_steps": [
+    "rkdoctor rtsp rtsp://127.0.0.1:554/stream1",
     "rkdoctor rtsp rtsp://127.0.0.1:554/stream1"
    ]
   }
