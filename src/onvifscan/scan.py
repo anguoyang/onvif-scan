@@ -51,11 +51,11 @@ def _snapshot_uri_body(token, ns, tag):
             '</{t}:ProfileToken></{t}:GetSnapshotUri>').format(t=tag, ns=ns, tok=escape(token))
 
 
-def _encoder_options_body(token):
-    # Media2 request is deliberately held at the D1 specification conflict.
-    return ('<trt:GetVideoEncoderConfigurationOptions xmlns:trt="%s">'
-            '<trt:ConfigurationToken>%s</trt:ConfigurationToken>'
-            '</trt:GetVideoEncoderConfigurationOptions>') % (TRT, escape(token))
+def _encoder_options_body(token, ns=TRT, tag="trt"):
+    return ('<{t}:GetVideoEncoderConfigurationOptions xmlns:{t}="{ns}">'
+            '<{t}:ConfigurationToken>{token}</{t}:ConfigurationToken>'
+            '</{t}:GetVideoEncoderConfigurationOptions>').format(
+                t=tag, ns=ns, token=escape(token))
 
 
 def _ptz_body(operation, parameter, token):
@@ -281,11 +281,11 @@ def scan_device(entry, cred_resolver, timeout=5.0):
         result = {"status": "unqueried", "reason": "missing encoder configuration token", "data": None}
         if caller.auth_failed:
             result.update(status="auth_blocked", reason="authentication gate closed")
-        elif prof["media_gen"] == 2:
-            result["reason"] = "D1 conflict: GetConfiguration is a WSDL type, not a wrapper element"
         elif token:
-            result = caller.query(svc_by_gen[prof["media_gen"]], _encoder_options_body(token),
-                                  lambda xml: P.parse_encoder_options(xml, 1))
+            gen = prof["media_gen"]
+            ns, tag = (TRT, "trt") if gen == 1 else (TR2, "tr2")
+            result = caller.query(svc_by_gen[gen], _encoder_options_body(token, ns, tag),
+                                  lambda xml: P.parse_encoder_options(xml, gen))
         prof["encoder_options"] = result
     # stream + snapshot URIs per profile (bounded)
     for prof in profiles[:8]:
