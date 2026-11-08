@@ -267,19 +267,18 @@ def handle_soap(p, path, raw):
         return 200, envelope('<t:%sResponse xmlns:t="%s" xmlns:tt="%s">%s</t:%sResponse>'
                              % (op, ns, TT, payload, op))
     if op == "GetVideoEncoderConfigurationOptions":
-        # D1 conflict: do not implement a Media2 request contract until resolved.
-        if p["media2"]:
-            return 400, fault("D1 request contract pending", "ActionNotSupported")
-        ns = "http://www.onvif.org/ver10/media/wsdl"
+        ns = "http://www.onvif.org/ver%s/media/wsdl" % ("20" if p["media2"] else "10")
+        service_path = "/onvif/media2" if p["media2"] else "/onvif/Media"
         request = list(body)[0]
         children = list(request)
-        if (operation != "{%s}%s" % (ns, op) or path != "/onvif/Media"
+        if (operation != "{%s}%s" % (ns, op) or path != service_path
                 or len(children) != 1 or children[0].tag != "{%s}ConfigurationToken" % ns
+                or len(children[0]) != 0
                 or children[0].text != p.get("encoder_token", "VE_1")):
             return 400, fault("invalid options request", "InvalidArgVal")
         if not check_auth(p, root):
             return 401, fault()
-        return 200, encoder_options_response()
+        return 200, encoder_options_response(p["media2"])
     if "GetProfiles" in text:
         if not check_auth(p, root):
             return 401, fault()

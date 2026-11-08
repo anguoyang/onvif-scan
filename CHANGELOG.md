@@ -4,10 +4,12 @@
 
 - Add per-profile source configuration names and provenance to JSON/HTML;
   show actual source tokens alongside the legacy configuration tokens.
-- Collect Media1 encoder options for every profile with an encoder token,
+- Collect Media1/Media2 encoder options for every profile with an encoder token,
   preserving declaration ranges, per-codec resolutions and profiles. Parse
-  Media2 fractional frame-rate lists; Media2 options requests remain explicitly
-  `unqueried` because frozen D1's wrapper conflicts with the official WSDL type.
+  Media2 fractional frame-rate lists. Resolve D1 with a direct ConfigurationToken
+  child in the Media2 operation element, without a GetConfiguration wrapper.
+  Validate the request shape and authentication rejection gate end to end with
+  the strict simulator.
 - Query PTZ GetNodes, supplement missing/incomplete nodes with GetNode once
   per token, and query GetPresets per associated profile. Keep node capacity
   separate from actual preset counts/names; never export preset coordinates
