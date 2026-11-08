@@ -104,15 +104,18 @@ class TestOptionsScan(SimCase):
         self.assertEqual([p['encoder_options']['status'] for p in rec['profiles']], ['ok'] * 10)
         self.assertTrue(all(p['fps_limit'] == 25 for p in rec['profiles']))
 
-    def test_legacy_options_and_media2_explicit_d1_blocker(self):
+    def test_legacy_and_media2_options_ok(self):
+        # D1 revised (official Media2 WSDL: the operation element directly
+        # contains ConfigurationToken, no GetConfiguration wrapper), so the
+        # strict/Media2 persona is queried just like legacy/Media1.
         for name in ('legacy', 'strict'):
             p, entry = self.start(name)
             rec = self.scan(entry)
             for profile in rec['profiles']:
-                self.assertEqual(profile['encoder_options']['status'], 'unqueried' if name == 'strict' else 'ok')
+                self.assertEqual(profile['encoder_options']['status'], 'ok')
             if name == 'strict':
-                self.assertFalse(any(c['operation'] == 'GetVideoEncoderConfigurationOptions' for c in p['calls']))
-                self.assertIn('D1 conflict', render_html(build_report('test', {}, [rec], 0)))
+                self.assertTrue(any(c['operation'] == 'GetVideoEncoderConfigurationOptions' for c in p['calls']))
+                self.assertNotIn('D1 conflict', render_html(build_report('test', {}, [rec], 0)))
 
     def test_options_failure_states(self):
         for response, expected in (((400, fault('unsupported', 'ActionNotSupported')), 'unsupported'),
