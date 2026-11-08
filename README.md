@@ -21,9 +21,10 @@ model, firmware, serial, channels, per-profile codec / resolution / frame
 rate, PTZ presence, clock health, and the (password-masked) RTSP stream URI
 for each profile, ready to hand to a stream checker.
 
-The v0.2 work also reports profile-visible source associations, Media1 encoder
-option declarations, PTZ node declarations and preset counts/names. Media2
-options queries are explicitly held at a specification conflict. See the
+The v0.2 work also reports profile-visible source associations, Media1/Media2
+encoder option declarations, PTZ node declarations and preset counts/names.
+The revised D1 Media2 request shape is implemented and tested end to end with
+the strict simulator, including fractional frame rates. See the
 [field contract and limitations](docs/v0.2-capabilities.md).
 
 ## Why
