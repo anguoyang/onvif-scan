@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from onvifscan import cli
 from onvifscan.discovery import merge_matches, parse_probe_matches
+from onvifscan.parse import parse_scopes
 from onvifscan.report import build_report, render_html, scrub_secrets, terminal_lines
 from onvifscan.soap import build_wsse_header, password_digest
 
@@ -86,6 +87,54 @@ class TestDiscoveryParse(unittest.TestCase):
         merged = merge_matches([parsed[0], repeated])
         self.assertEqual(len(merged), 1)
         self.assertEqual(merged[0]["xaddrs"], parsed[0]["xaddrs"])
+
+    def test_scopes_minimal_fixture_parses_and_merges(self):
+        fixture = Path(__file__).parent / "fixtures" / "scopes_minimal_probe.xml"
+        parsed = parse_probe_matches(fixture.read_bytes())
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0]["endpoint"], "urn:uuid:scopes-minimal-camera")
+        self.assertEqual(parsed[0]["xaddrs"], [
+            "http://192.0.2.20/onvif/device_service",
+        ])
+
+        scopes = parse_scopes(parsed[0]["scopes"])
+        self.assertIsNone(scopes["mac"])
+        self.assertIsNone(scopes["name"])
+        self.assertEqual(scopes["profiles"], ["Streaming"])
+        self.assertEqual(scopes["hardware"], "IPC-200")
+        self.assertEqual(scopes["location"], "country/example")
+
+        minimal = dict(parsed[0], source_ip="192.0.2.20")
+        merged_alone = merge_matches([minimal])
+        self.assertEqual(len(merged_alone), 1)
+        alone_scopes = parse_scopes(merged_alone[0]["scopes"])
+        self.assertIsNone(alone_scopes["mac"])
+        self.assertIsNone(alone_scopes["name"])
+        self.assertEqual(alone_scopes["profiles"], ["Streaming"])
+        self.assertEqual(alone_scopes["hardware"], "IPC-200")
+        self.assertEqual(alone_scopes["location"], "country/example")
+
+        richer_scopes_str = (
+            parsed[0]["scopes"]
+            + " onvif://www.onvif.org/name/Minimal%20Camera"
+            + " onvif://www.onvif.org/mac/00:11:22:33:44:55"
+        )
+        richer = dict(
+            parsed[0],
+            scopes=richer_scopes_str,
+            xaddrs=["http://[2001:db8::20]:80/onvif/device_service"],
+            source_ip="2001:db8::20",
+        )
+        merged_with_richer = merge_matches([minimal, richer])
+        self.assertEqual(len(merged_with_richer), 1)
+        self.assertEqual(merged_with_richer[0]["scopes"], richer_scopes_str)
+        self.assertEqual(merged_with_richer[0]["xaddrs"], [
+            "http://192.0.2.20/onvif/device_service",
+            "http://[2001:db8::20]:80/onvif/device_service",
+        ])
+        merged_scopes = parse_scopes(merged_with_richer[0]["scopes"])
+        self.assertEqual(merged_scopes["name"], "Minimal Camera")
+        self.assertEqual(merged_scopes["mac"], "00:11:22:33:44:55")
 
 
 def _device(level="FULL"):
