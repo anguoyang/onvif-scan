@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 
 from . import __version__
 from .discovery import DISCOVERY_PORT, discover, iface_ipv4
-from .report import build_report, render_html, scrub_secrets, terminal_lines, write_json
+from .report import build_report, render_html, scrub_secrets, terminal_lines, write_csv, write_json
 from .scan import scan_device
 
 ZERO_RESULT_HINT = (
@@ -59,6 +59,7 @@ def main(argv=None):
                     help="skip discovery for this device service URL (repeatable)")
     sc.add_argument("--discovery-port", type=int, default=DISCOVERY_PORT)
     sc.add_argument("--json", default="onvif-inventory.json")
+    sc.add_argument("--csv", metavar="PATH", help="also export device/profile rows as CSV")
     sc.add_argument("--html", default="onvif-inventory.html")
     sc.add_argument("--no-html", action="store_true")
     sc.add_argument("--lang", choices=("en", "zh-CN"), default="en",
@@ -135,6 +136,8 @@ def main(argv=None):
     report = scrub_secrets(report, secrets)
 
     write_json(report, args.json)
+    if args.csv:
+        write_csv(report, args.csv)
     if not args.no_html:
         with open(args.html, "w", encoding="utf-8") as f:
             f.write(render_html(report, lang=args.lang))
@@ -143,7 +146,8 @@ def main(argv=None):
         print(line)
     if not devices_raw and not args.quiet:
         print(ZERO_RESULT_HINT)
-    print("reports: %s%s" % (args.json, "" if args.no_html else " + " + args.html))
+    print("reports: %s%s%s" % (args.json, "" if args.no_html else " + " + args.html,
+                               " + " + args.csv if args.csv else ""))
     return 0
 
 
