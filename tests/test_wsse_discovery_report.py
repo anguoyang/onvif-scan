@@ -117,6 +117,114 @@ class TestReport(unittest.TestCase):
         self.assertIn("Acme", html)
         self.assertTrue(any("FULL" in line for line in terminal_lines(report)))
 
+    def test_render_html_en_contract_and_zh_cn_labels(self):
+        dev = _device()
+        dev["mac"] = "aa:bb:cc:dd:ee:ff"
+        dev["mac_source"] = "scopes"
+        dev["channel_count"] = 1
+        dev["channel_count_basis"] = "video_source"
+        dev["ptz"] = {
+            "present": True, "evidence": "capability_xaddr",
+            "nodes_status": "ok", "nodes_reason": None,
+            "nodes": [{"token": "N1", "status": "ok", "reason": None, "source": "GetNodes",
+                       "data": {"name": "MainNode", "maximum_number_of_presets": 80,
+                                "home_supported": True, "fixed_home_position": False,
+                                "supported_preset_tour": {"maximum_number_of_preset_tours": 2,
+                                                          "operations": ["Start"]}}}],
+        }
+        dev["services_declared"] = [{
+            "namespace": "http://www.onvif.org/ver10/media/wsdl",
+            "xaddr": "http://192.0.2.10/onvif/Media",
+            "version": {"major": 2, "minor": 6},
+            "missing_fields": [], "invalid_fields": [],
+        }]
+        dev["service_sources"] = {"media": "GetCapabilities"}
+        dev["profiles"] = [{
+            "token": "P1", "media_gen": 1, "video_source_token": "VS_SRC",
+            "source_token": "VS_CFG", "source_configuration_name": "FrontCam",
+            "source_name_origin": "VideoSourceConfiguration.Name",
+            "codec": "H264", "width": 1920, "height": 1080, "fps_limit": 25,
+            "stream_uri": "rtsp://admin:***@192.0.2.10/stream1",
+            "ptz_configuration_token": "PTZ_CFG", "ptz_node_token": "N1",
+            "ptz_node_status": "ok", "ptz_node_reason": None,
+            "ptz_presets": {"status": "ok", "reason": None, "data": {"count": 2, "names": ["Home", "Gate"]}},
+            "encoder_options": {"status": "ok", "reason": None,
+                                "data": {"encodings": ["H264"],
+                                         "declarations": [{"encoding": "H264", "origin": "H264"}]}},
+        }]
+        dev["next_steps"] = ["rkdoctor rtsp rtsp://admin:***@192.0.2.10/stream1"]
+        report = build_report("0.2.0", {"interfaces": ["eth0"], "subnets": ["192.0.2.0/24"], "probe_count": 1},
+                              [dev], 1.5)
+        html_default = render_html(report)
+        html_en = render_html(report, lang="en")
+        self.assertEqual(html_default, html_en)
+        self.assertIn('<html lang="en">', html_en)
+
+        html_zh = render_html(report, lang="zh-CN")
+        self.assertIn('<html lang="zh-CN">', html_zh)
+        self.assertIn("<title>ONVIF 资产盘点 — ", html_zh)
+        self.assertIn("<h1>ONVIF 摄像头资产盘点</h1>", html_zh)
+        for label in ("已发现", "完整", "部分", "仅发现", "不可达", "有发现项",
+                      "<th>厂商</th>", "<th>型号</th>", "<th>固件</th>", "<th>通道数</th>",
+                      "<th>主码流</th>", "<th>级别</th>", "<td>是</td>",
+                      "级别 FULL · MAC aa:bb:cc:dd:ee:ff (scopes) · 时钟偏移 0 s · 鉴权 none/not_tried · 序列号 S",
+                      "声明的服务 (GetServices)", "<th>命名空间</th>", "<th>版本</th>",
+                      "<th>缺失字段</th>", "<th>无效字段</th>", "选定路由来源：media: GetCapabilities",
+                      "<h4>配置文件 P1 (Media1)</h4><p>编码器选项：ok · —</p>",
+                      "仅为设备声明；不保证编码、分辨率与帧率的任意组合均可用。",
+                      "PTZ 配置 PTZ_CFG · 节点 N1 · 节点状态 ok (—)",
+                      "预置位：ok (—) · 实际数量 2 · 名称 [&#x27;Home&#x27;, &#x27;Gate&#x27;]",
+                      "<h4>PTZ 节点声明</h4><p>GetNodes：ok (—)</p>",
+                      "预置位容量 (MaximumNumberOfPresets)",
+                      "仅限配置文件可见源；配置名称并非物理源名称。通道数计算依据：video_source。",
+                      "<th>流地址（密码已脱敏）</th>",
+                      "<p>下一步（流验收）：</p>",
+                      "<code>rkdoctor rtsp rtsp://admin:***@192.0.2.10/stream1</code>"):
+            self.assertIn(label, html_zh)
+
+    def test_render_html_zh_cn_findings_parameterized_and_fallback(self):
+        from onvifscan.report import FINDING_DETAILS_ZH
+        dev = _device()
+        dev["findings"] = [
+            {"code": "UNREACHABLE", "severity": "warn",
+             "detail": "device service did not answer: URLError: <urlopen error timed out>"},
+            {"code": "CLOCK_SKEW", "severity": "warn",
+             "detail": "device clock offset -3600s; check NTP on the device"},
+            {"code": "XADDR_MISMATCH", "severity": "info",
+             "detail": "XAddr host 192.168.10.5 differs from responder 10.0.0.12"},
+            {"code": "NO_XADDR", "severity": "warn", "detail": "ProbeMatch carried no XAddr"},
+            {"code": "UNAUTH_CAPS_DISCLOSURE", "severity": "info",
+             "detail": "GetCapabilities answered without authentication"},
+            {"code": "CAPS_FALLBACK", "severity": "info",
+             "detail": "no capabilities/services response; conventional service paths assumed"},
+            {"code": "UNAUTH_INFO_DISCLOSURE", "severity": "warn",
+             "detail": "GetDeviceInformation answered without authentication (loose/legacy firmware)"},
+            {"code": "SCOPES_MINIMAL", "severity": "info",
+             "detail": "discovery Scopes lack mac/name; identity completed from other sources where possible"},
+            {"code": "MEDIA2_ONLY", "severity": "info",
+             "detail": "profiles only via Media2 (Profile T generation)"},
+            {"code": "LEGACY_MEDIA_ONLY", "severity": "info",
+             "detail": "profiles only via Media ver10"},
+            {"code": "AUTH_FAILED", "severity": "warn",
+             "detail": "supplied credential rejected once; not retried. Note many vendors keep a separate ONVIF user (distinct from the web user)"},
+            {"code": "STREAM_URI_MISSING", "severity": "warn",
+             "detail": "profiles found but GetStreamUri returned nothing; rkdoctor hand-off unavailable"},
+            {"code": "NO_PTZ", "severity": "info", "detail": "no PTZ capability found"},
+            {"code": "RESPONSE_MALFORMED", "severity": "warn",
+             "detail": "at least one SOAP response needed loose parsing (non-conformant XML)"},
+            {"code": "CLOCK_SKEW", "severity": "warn",
+             "detail": "unexpected format offset=99s"},
+        ]
+        self.assertEqual(len(FINDING_DETAILS_ZH), 14)
+        report = build_report("0.2.0", {"interfaces": [], "subnets": [], "probe_count": 1}, [dev], 0.5)
+        html_zh = render_html(report, lang="zh-CN")
+        self.assertIn("<li><b>UNREACHABLE</b> (警告) — 设备服务未响应：URLError: &lt;urlopen error timed out&gt;</li>", html_zh)
+        self.assertIn("<li><b>CLOCK_SKEW</b> (警告) — 设备时钟偏移 -3600s；请检查设备上的 NTP 配置</li>", html_zh)
+        self.assertIn("<li><b>XADDR_MISMATCH</b> (信息) — XAddr 主机 192.168.10.5 与响应源 10.0.0.12 不一致</li>", html_zh)
+        self.assertIn("<li><b>NO_PTZ</b> (信息) — 未发现 PTZ 能力</li>", html_zh)
+        self.assertIn("<li><b>AUTH_FAILED</b> (警告) — 提供的凭据被拒绝一次；未再重试。", html_zh)
+        self.assertIn("<li><b>CLOCK_SKEW</b> (警告) — unexpected format offset=99s</li>", html_zh)
+
 
 if __name__ == "__main__":
     unittest.main()

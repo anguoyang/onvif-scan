@@ -61,6 +61,8 @@ def main(argv=None):
     sc.add_argument("--json", default="onvif-inventory.json")
     sc.add_argument("--html", default="onvif-inventory.html")
     sc.add_argument("--no-html", action="store_true")
+    sc.add_argument("--lang", choices=("en", "zh-CN"), default="en",
+                    help="HTML report language (default en)")
     sc.add_argument("--quiet", action="store_true",
                     help="print only the summary line and report paths (for cron)")
     args = ap.parse_args(argv)
@@ -135,7 +137,7 @@ def main(argv=None):
     write_json(report, args.json)
     if not args.no_html:
         with open(args.html, "w", encoding="utf-8") as f:
-            f.write(render_html(report))
+            f.write(render_html(report, lang=args.lang))
     lines = terminal_lines(report)
     for line in lines[-1:] if args.quiet else lines:
         print(line)

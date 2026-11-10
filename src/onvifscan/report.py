@@ -80,13 +80,67 @@ def _esc(x):
     return html.escape(str(x)) if x is not None else "—"
 
 
-def render_html(report):
+_SEVERITY_ZH = {
+    "warn": "警告",
+    "info": "信息",
+}
+
+FINDING_DETAILS_ZH = {
+    "NO_XADDR": "ProbeMatch 未包含 XAddr",
+    "UNREACHABLE": "设备服务未响应：%s",
+    "UNAUTH_CAPS_DISCLOSURE": "GetCapabilities 在无鉴权情况下返回了响应",
+    "CAPS_FALLBACK": "未收到能力集/服务响应；已假定使用常规服务路径",
+    "UNAUTH_INFO_DISCLOSURE": "GetDeviceInformation 在无鉴权情况下返回了响应（宽松/老旧固件）",
+    "CLOCK_SKEW": "设备时钟偏移 %ss；请检查设备上的 NTP 配置",
+    "XADDR_MISMATCH": "XAddr 主机 %s 与响应源 %s 不一致",
+    "SCOPES_MINIMAL": "发现 Scopes 缺少 mac/name；已尽可能从其他来源补全设备身份信息",
+    "MEDIA2_ONLY": "仅通过 Media2 获取到配置文件（Profile T 代际）",
+    "LEGACY_MEDIA_ONLY": "仅通过老版 Media ver10 获取到配置文件",
+    "AUTH_FAILED": "提供的凭据被拒绝一次；未再重试。注意许多厂商使用独立的 ONVIF 用户（不同于 Web 用户）",
+    "STREAM_URI_MISSING": "已找到配置文件但 GetStreamUri 未返回流地址；无法接力给 rkdoctor",
+    "NO_PTZ": "未发现 PTZ 能力",
+    "RESPONSE_MALFORMED": "至少一个 SOAP 响应需要宽松解析（非标准 XML）",
+}
+
+
+def _translate_finding_detail(finding):
+    code = finding.get("code")
+    detail = finding.get("detail")
+    if not isinstance(detail, str) or code not in FINDING_DETAILS_ZH:
+        return detail
+    template = FINDING_DETAILS_ZH[code]
+    if code == "UNREACHABLE":
+        prefix = "device service did not answer: "
+        if detail.startswith(prefix):
+            return template % detail[len(prefix):]
+        return detail
+    if code == "CLOCK_SKEW":
+        prefix = "device clock offset "
+        suffix = "s; check NTP on the device"
+        if (detail.startswith(prefix) and detail.endswith(suffix)
+                and len(detail) > len(prefix) + len(suffix)):
+            return template % detail[len(prefix):-len(suffix)]
+        return detail
+    if code == "XADDR_MISMATCH":
+        prefix = "XAddr host "
+        sep = " differs from responder "
+        if detail.startswith(prefix) and sep in detail[len(prefix):]:
+            h1, h2 = detail[len(prefix):].split(sep, 1)
+            if h1 and h2:
+                return template % (h1, h2)
+        return detail
+    return template
+
+
+def render_html(report, lang: str = "en"):
+    zh = lang == "zh-CN"
     s = report["summary"]
     rows = []
     details = []
     for d in report["devices"]:
         info = d.get("device_info") or {}
         p0 = d["profiles"][0] if d["profiles"] else {}
+        ptz_label = ("是" if d["ptz"]["present"] else "否") if zh else ("yes" if d["ptz"]["present"] else "no")
         rows.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
                     "<td>%s</td><td>%s</td><td>%s</td></tr>" % (
                         _esc(d.get("ip")), _esc(info.get("Manufacturer")),
@@ -94,7 +148,7 @@ def render_html(report):
                         d["channel_count"],
                         _esc("%s %sx%s" % (p0.get("codec") or "", p0.get("width") or "",
                                            p0.get("height") or "") if p0 else "—"),
-                        "yes" if d["ptz"]["present"] else "no", _esc(d["level"])))
+                        ptz_label, _esc(d["level"])))
         prof_rows = "".join(
             "<tr><td>%s (Media%s)</td><td>%s</td><td>%s</td><td>%s (%s)</td>"
             "<td>%s</td><td>%s×%s</td><td>%s</td><td>%s</td></tr>" % (
@@ -106,33 +160,52 @@ def render_html(report):
         profile_details = ""
         for p in d["profiles"]:
             options = p.get("encoder_options", {})
-            profile_details += "<h4>Profile %s (Media%s)</h4><p>Encoder options: %s · %s</p>" % (
+            profile_details += (
+                "<h4>配置文件 %s (Media%s)</h4><p>编码器选项：%s · %s</p>" if zh else
+                "<h4>Profile %s (Media%s)</h4><p>Encoder options: %s · %s</p>"
+            ) % (
                 _esc(p.get("token")), _esc(p.get("media_gen")),
                 _esc(options.get("status", "unqueried")), _esc(options.get("reason")))
             if options.get("data") is not None:
-                profile_details += ("<p>Device declarations only; arbitrary combinations of encoding, "
-                                    "resolution and frame rate are not guaranteed.</p>")
+                profile_details += (
+                    "<p>仅为设备声明；不保证编码、分辨率与帧率的任意组合均可用。</p>" if zh else
+                    "<p>Device declarations only; arbitrary combinations of encoding, "
+                    "resolution and frame rate are not guaranteed.</p>"
+                )
                 for declaration in options["data"]["declarations"]:
                     profile_details += "<dl>%s</dl>" % "".join(
                         "<dt>%s</dt><dd>%s</dd>" % (_esc(key), _esc(json.dumps(value, ensure_ascii=False)))
                         for key, value in declaration.items())
             presets = p.get("ptz_presets", {})
             preset_data = presets.get("data") or {}
-            profile_details += ("<p>PTZ configuration %s · node %s · node status %s (%s)</p>"
-                                "<p>Presets: %s (%s) · actual count %s · names %s</p>") % (
+            profile_details += (
+                "<p>PTZ 配置 %s · 节点 %s · 节点状态 %s (%s)</p>"
+                "<p>预置位：%s (%s) · 实际数量 %s · 名称 %s</p>" if zh else
+                "<p>PTZ configuration %s · node %s · node status %s (%s)</p>"
+                "<p>Presets: %s (%s) · actual count %s · names %s</p>"
+            ) % (
                 _esc(p.get("ptz_configuration_token")), _esc(p.get("ptz_node_token")),
                 _esc(p.get("ptz_node_status", "unqueried")), _esc(p.get("ptz_node_reason")),
                 _esc(presets.get("status", "unqueried")), _esc(presets.get("reason")),
                 _esc(preset_data.get("count")), _esc(preset_data.get("names")))
         ptz = d.get("ptz", {})
-        profile_details += "<h4>PTZ node declarations</h4><p>GetNodes: %s (%s)</p>" % (
+        profile_details += (
+            "<h4>PTZ 节点声明</h4><p>GetNodes：%s (%s)</p>" if zh else
+            "<h4>PTZ node declarations</h4><p>GetNodes: %s (%s)</p>"
+        ) % (
             _esc(ptz.get("nodes_status", "unqueried")), _esc(ptz.get("nodes_reason")))
         for node in ptz.get("nodes", []):
             data = node.get("data") or {}
-            profile_details += ("<p>Node %s (%s) · %s (%s) · source %s</p>"
-                                "<dl><dt>Preset capacity (MaximumNumberOfPresets)</dt><dd>%s</dd>"
-                                "<dt>HomeSupported</dt><dd>%s</dd><dt>FixedHomePosition</dt><dd>%s</dd>"
-                                "<dt>SupportedPresetTour declaration</dt><dd>%s</dd></dl>") % (
+            profile_details += (
+                "<p>节点 %s (%s) · %s (%s) · 来源 %s</p>"
+                "<dl><dt>预置位容量 (MaximumNumberOfPresets)</dt><dd>%s</dd>"
+                "<dt>支持守望位 (HomeSupported)</dt><dd>%s</dd><dt>固定守望位 (FixedHomePosition)</dt><dd>%s</dd>"
+                "<dt>支持的预置位巡航声明 (SupportedPresetTour)</dt><dd>%s</dd></dl>" if zh else
+                "<p>Node %s (%s) · %s (%s) · source %s</p>"
+                "<dl><dt>Preset capacity (MaximumNumberOfPresets)</dt><dd>%s</dd>"
+                "<dt>HomeSupported</dt><dd>%s</dd><dt>FixedHomePosition</dt><dd>%s</dd>"
+                "<dt>SupportedPresetTour declaration</dt><dd>%s</dd></dl>"
+            ) % (
                 _esc(node.get("token")), _esc(data.get("name")),
                 _esc(node.get("status")), _esc(node.get("reason")),
                 _esc(node.get("source")), _esc(data.get("maximum_number_of_presets")),
@@ -140,9 +213,9 @@ def render_html(report):
                 _esc(json.dumps(data.get("supported_preset_tour"), ensure_ascii=False)))
         declared = d.get("services_declared")
         if declared is None:
-            service_html = "<p>Services declared: not obtained</p>"
+            service_html = "<p>声明的服务：未获取</p>" if zh else "<p>Services declared: not obtained</p>"
         elif not declared:
-            service_html = "<p>Services declared: 0</p>"
+            service_html = "<p>声明的服务：0</p>" if zh else "<p>Services declared: 0</p>"
         else:
             service_rows = "".join(
                 "<tr><td>%s</td><td>%s</td><td>%s.%s</td><td>%s</td><td>%s</td></tr>" % (
@@ -151,33 +224,74 @@ def render_html(report):
                     _esc(service.get("version", {}).get("minor")),
                     _esc(", ".join(service.get("missing_fields", []))),
                     _esc(", ".join(service.get("invalid_fields", [])))) for service in declared)
-            service_html = ("<h4>Services declared (GetServices)</h4><table><tr><th>Namespace</th>"
-                            "<th>XAddr</th><th>Version</th><th>Missing fields</th>"
-                            "<th>Invalid fields</th></tr>%s</table>" % service_rows)
+            service_html = (
+                "<h4>声明的服务 (GetServices)</h4><table><tr><th>命名空间</th>"
+                "<th>XAddr</th><th>版本</th><th>缺失字段</th>"
+                "<th>无效字段</th></tr>%s</table>" if zh else
+                "<h4>Services declared (GetServices)</h4><table><tr><th>Namespace</th>"
+                "<th>XAddr</th><th>Version</th><th>Missing fields</th>"
+                "<th>Invalid fields</th></tr>%s</table>"
+            ) % service_rows
         if d.get("service_sources"):
-            service_html += "<p>Selected route sources: %s</p>" % _esc(
+            service_html += ("<p>选定路由来源：%s</p>" if zh else "<p>Selected route sources: %s</p>") % _esc(
                 ", ".join("%s: %s" % (key, source)
                           for key, source in d["service_sources"].items()))
-        find_items = "".join("<li><b>%s</b> (%s) — %s</li>" % (
-            _esc(f["code"]), _esc(f["severity"]), _esc(f["detail"])) for f in d["findings"])
+        if zh:
+            find_items = "".join("<li><b>%s</b> (%s) — %s</li>" % (
+                _esc(f["code"]),
+                _esc(_SEVERITY_ZH.get(f["severity"], f["severity"])),
+                _esc(_translate_finding_detail(f))) for f in d["findings"])
+        else:
+            find_items = "".join("<li><b>%s</b> (%s) — %s</li>" % (
+                _esc(f["code"]), _esc(f["severity"]), _esc(f["detail"])) for f in d["findings"])
         steps = "".join("<li><code>%s</code></li>" % _esc(x) for x in d["next_steps"])
         details.append(
-            "<h3>%s — %s %s</h3><p>level %s · MAC %s (%s) · clock offset %s s · "
-            "auth %s/%s · serial %s</p>%s%s%s%s" % (
+            ("<h3>%s — %s %s</h3><p>级别 %s · MAC %s (%s) · 时钟偏移 %s s · "
+             "鉴权 %s/%s · 序列号 %s</p>%s%s%s%s" if zh else
+             "<h3>%s — %s %s</h3><p>level %s · MAC %s (%s) · clock offset %s s · "
+             "auth %s/%s · serial %s</p>%s%s%s%s") % (
                 _esc(d.get("ip")), _esc(info.get("Manufacturer")), _esc(info.get("Model")),
                 _esc(d["level"]), _esc(d.get("mac")), _esc(d.get("mac_source")),
                 _esc(d["clock"].get("offset_s")), _esc(d["auth"]["mode"]),
                 _esc(d["auth"]["result"]), _esc(info.get("SerialNumber")),
                 service_html + profile_details,
-                ("<p>Profile-visible sources only; configuration names are not physical source names. "
-                 "Legacy channel count basis: %s.</p>"
-                 "<table><tr><th>profile</th><th>source token</th><th>source configuration token</th>"
-                 "<th>configuration name (origin)</th><th>codec</th><th>size</th>"
-                 "<th>fps</th><th>stream (password masked)</th></tr>%s</table>" %
+                (("<p>仅限配置文件可见源；配置名称并非物理源名称。"
+                  "通道数计算依据：%s。</p>"
+                  "<table><tr><th>配置文件</th><th>视频源令牌</th><th>源配置令牌</th>"
+                  "<th>配置名称（来源）</th><th>编码</th><th>分辨率</th>"
+                  "<th>帧率</th><th>流地址（密码已脱敏）</th></tr>%s</table>" if zh else
+                  "<p>Profile-visible sources only; configuration names are not physical source names. "
+                  "Legacy channel count basis: %s.</p>"
+                  "<table><tr><th>profile</th><th>source token</th><th>source configuration token</th>"
+                  "<th>configuration name (origin)</th><th>codec</th><th>size</th>"
+                  "<th>fps</th><th>stream (password masked)</th></tr>%s</table>") %
                  (_esc(d.get("channel_count_basis")), prof_rows))
                 if prof_rows else "",
                 ("<ul>%s</ul>" % find_items) if find_items else "",
-                ("<p>Next step (stream acceptance):</p><ul>%s</ul>" % steps) if steps else ""))
+                (("<p>下一步（流验收）：</p><ul>%s</ul>" if zh else
+                  "<p>Next step (stream acceptance):</p><ul>%s</ul>") % steps) if steps else ""))
+    if zh:
+        return """<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<title>ONVIF 资产盘点 — %s</title>
+<style>body{font-family:system-ui,sans-serif;margin:2rem;color:#14201c}
+table{border-collapse:collapse;margin:1rem 0}td,th{border:1px solid #c8d4cf;padding:.35rem .6rem;text-align:left}
+.card{display:inline-block;border:1px solid #c8d4cf;border-radius:.5rem;padding:.6rem 1rem;margin:.2rem}
+h1{font-size:1.4rem}footer{margin-top:2rem;color:#5a6b64;font-size:.85rem}</style></head>
+<body><h1>ONVIF 摄像头资产盘点</h1>
+<p>%s · 扫描 %s · %ss</p>
+<div><span class="card">已发现 <b>%d</b></span><span class="card">完整 <b>%d</b></span>
+<span class="card">部分 <b>%d</b></span><span class="card">仅发现 <b>%d</b></span>
+<span class="card">不可达 <b>%d</b></span><span class="card">有发现项 <b>%d</b></span></div>
+<table><tr><th>IP</th><th>厂商</th><th>型号</th><th>固件</th><th>通道数</th>
+<th>主码流</th><th>PTZ</th><th>级别</th></tr>%s</table>
+%s
+<footer>%s</footer></body></html>""" % (
+            _esc(report["generated_at"]), _esc(report["generated_at"]),
+            _esc(", ".join(report["scan"].get("subnets") or []) or "定向"),
+            report["scan"].get("duration_s"),
+            s["discovered"], s["full"], s["partial"], s["discovered_only"],
+            s["unreachable"], s["with_findings"], "".join(rows), "".join(details), FOOTER)
     return """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <title>ONVIF inventory — %s</title>
