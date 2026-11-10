@@ -6,6 +6,7 @@ parse time. scrub_secrets() still walks the finished report and removes
 any occurrence of a password that was used during the scan, so a bug
 upstream cannot turn into a leaked credential in a delivered report.
 """
+import csv
 import html
 import json
 from datetime import datetime, timezone
@@ -50,6 +51,42 @@ def write_json(report, path):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=1)
         f.write("\n")
+
+
+CSV_COLUMNS = (
+    "ip", "port", "mac", "manufacturer", "model", "firmware_version", "hostname",
+    "level", "profile_token", "profile_name", "media_gen", "video_source_token",
+    "encoder_options_status", "ptz_node_token", "preset_count", "channel_count",
+    "clock_offset_s", "findings",
+)
+
+
+def write_csv(report, path):
+    """Export the already-scrubbed inventory, one row per device/profile.
+
+    csv.writer renders None as an empty cell and handles quoting/newlines.
+    Unknown preset counts stay empty; a successful empty query stays zero.
+    """
+    with open(path, "w", encoding="utf-8-sig", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(CSV_COLUMNS)
+        for device in report["devices"]:
+            info = device.get("device_info") or {}
+            codes = sorted({finding["code"] for finding in device.get("findings", [])
+                            if finding.get("code")})
+            for profile in device.get("profiles") or [{}]:
+                presets = (profile.get("ptz_presets") or {}).get("data") or {}
+                writer.writerow((
+                    device.get("ip"), device.get("port"), device.get("mac"),
+                    info.get("Manufacturer"), info.get("Model"), info.get("FirmwareVersion"),
+                    device.get("hostname"), device.get("level"), profile.get("token"),
+                    profile.get("name"), profile.get("media_gen"),
+                    profile.get("video_source_token"),
+                    (profile.get("encoder_options") or {}).get("status"),
+                    profile.get("ptz_node_token"), presets.get("count"),
+                    device.get("channel_count"), (device.get("clock") or {}).get("offset_s"),
+                    ";".join(codes),
+                ))
 
 
 _LEVEL_MARK = {"FULL": "●", "PARTIAL": "◐", "DISCOVERED_ONLY": "○", "UNREACHABLE": "✕"}

@@ -87,6 +87,53 @@ JSON 与 HTML 报告仍按原方式生成：
 PYTHONPATH=src python3 -m onvifscan scan --quiet
 ```
 
+## CSV 导出与基线 diff
+
+CSV 仅在显式指定 `--csv PATH` 时生成，可与 `--no-html`、`--quiet` 共存。
+quiet 扫描仍只输出两行，末行 `reports:` 补上 CSV 路径。
+
+```sh
+PYTHONPATH=src python3 -m onvifscan scan --csv inventory.csv --no-html --quiet
+PYTHONPATH=src python3 -m onvifscan diff old.json new.json
+PYTHONPATH=src python3 -m onvifscan diff old.json new.json --json changes.json --quiet
+```
+
+CSV 使用 UTF-8+BOM 和固定表头，每行是一台设备 × 一个 Profile；无 Profile
+的设备仍出一行，Profile 列为空。缺失值为空字符串，已知零个仍写 `0`。
+`findings` 仅含排序、去重后以分号连接的 code，不含 detail。固定列顺序：
+
+```text
+ip,port,mac,manufacturer,model,firmware_version,hostname,level,profile_token,profile_name,media_gen,video_source_token,encoder_options_status,ptz_node_token,preset_count,channel_count,clock_offset_s,findings
+```
+
+diff 离线读取两份已经过 scan 擦除密码的 JSON 报告，不扫描、不联网、不取凭据。
+两份输入均须为 `schema: 1`、`kind: "onvif_inventory"`；`tool_version` 不同
+仅在 stderr 警告，不算设备变化。设备优先用小写归一化 MAC 匹配，无 MAC 才退回
+IP；身份缺失或重复属于输入错误。同 MAC 换 IP 不算变化；从无 MAC 变为有 MAC
+或反向变化会改变身份键，表现为消失＋新增。
+
+只比六类字段：固件版本、level、Profile token/media_gen 对的集合、channel_count、
+findings code 集合、services_declared namespace 集合。集合忽略顺序和重复项。
+生成时间、扫描时长、detail 及其他设备/Profile 字段均不参与比对。diff 保留扫描
+报告已有的密码擦除结果，不索取密码来清洗手工改写的输入文件。
+
+终端输出 `diff: +A -R ~C =U`，分别表示新增、消失、变化和不变的设备数；
+`--quiet` 下也只输出这一行。仅 `--json OUT` 才写 diff JSON 文件。
+JSON 中 `added`/`removed` 是身份键数组，`unchanged` 是数量；`changed` 各项含
+`key`、`identity_basis`（`mac`/`ip`）和 `changes: [{field, old, new}]`。
+field 使用 JSON 路径式：`device_info.FirmwareVersion`、`level`、`profiles`、
+`channel_count`、`findings.code`、`services_declared.namespace`。
+Profile 集合写成排序后的 `{token, media_gen}` 对象数组；未知可选标量写 `null`，
+缺失集合按空集合比较。
+
+| 退出码 | 含义 |
+| --- | --- |
+| 0 | scan 正常完成，或 diff 无变化 |
+| 1 | diff 检测到新增、消失或变化设备 |
+| 2 | 参数/输入错误，包括文件不存在、JSON 非法、schema/kind 不符 |
+
+cron 脚本须将 diff 的 **1 视为变化通知，不是执行失败**。
+
 ## 结果怎么读
 
 逐台定级：**FULL**（身份+Profile 齐全）、**PARTIAL**（只有身份或能力）、

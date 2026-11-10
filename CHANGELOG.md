@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- Add opt-in `scan --csv PATH`: fixed UTF-8+BOM device × Profile rows, empty
+  cells for unknown values, finding code sets without details, and the same
+  scrubbed report used by JSON/HTML. Compatible with `--quiet`/`--no-html`.
+- Add offline `diff OLD.json NEW.json [--json OUT] [--quiet]`. Match lowercase
+  MAC first, falling back to IP; compare firmware, level, Profile token/media
+  generation sets, channel count, finding codes and declared service namespaces.
+  Ignore metadata noise and warn on tool version differences. Write JSON only
+  when requested; terminal summary is `diff: +A -R ~C =U`.
+- Diff exits 0 for no changes, 1 for changes and 2 for invalid arguments/inputs.
+  Keep schema 1 and the existing scan/authentication behavior unchanged.
+- Add 25 standard-library unittest cases (9 CSV, 16 diff), including HTTP-only
+  simulation of all three fictional personas and offline/credential isolation.
+
 ## v0.2.0 — 2026-11-08
 
 Capability inventory release. All additions are additive; JSON schema

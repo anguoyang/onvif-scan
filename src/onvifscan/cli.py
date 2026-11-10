@@ -13,7 +13,8 @@ from urllib.parse import urlparse
 
 from . import __version__
 from .discovery import DISCOVERY_PORT, discover, iface_ipv4
-from .report import build_report, render_html, scrub_secrets, terminal_lines, write_json
+from .diff import compare_inventories, load_inventory
+from .report import build_report, render_html, scrub_secrets, terminal_lines, write_csv, write_json
 from .scan import scan_device
 
 ZERO_RESULT_HINT = (
@@ -59,13 +60,36 @@ def main(argv=None):
                     help="skip discovery for this device service URL (repeatable)")
     sc.add_argument("--discovery-port", type=int, default=DISCOVERY_PORT)
     sc.add_argument("--json", default="onvif-inventory.json")
+    sc.add_argument("--csv", metavar="PATH", help="also export device/profile rows as CSV")
     sc.add_argument("--html", default="onvif-inventory.html")
     sc.add_argument("--no-html", action="store_true")
     sc.add_argument("--lang", choices=("en", "zh-CN"), default="en",
                     help="HTML report language (default en)")
     sc.add_argument("--quiet", action="store_true",
                     help="print only the summary line and report paths (for cron)")
+    df = sub.add_parser("diff", help="compare two inventory JSON files offline")
+    df.add_argument("old", metavar="OLD.json")
+    df.add_argument("new", metavar="NEW.json")
+    df.add_argument("--json", metavar="OUT", help="write the diff JSON to this file")
+    df.add_argument("--quiet", action="store_true", help="print only the diff summary")
     args = ap.parse_args(argv)
+
+    if args.cmd == "diff":
+        try:
+            old = load_inventory(args.old)
+            new = load_inventory(args.new)
+            if old.get("tool_version") != new.get("tool_version"):
+                print("warning: tool_version differs between inventories", file=sys.stderr)
+            result = compare_inventories(old, new)
+            if args.json:
+                write_json(result, args.json)
+        except (OSError, ValueError) as exc:
+            print("error: %s" % exc, file=sys.stderr)
+            return 2
+        print("diff: +%d -%d ~%d =%d" % (
+            len(result["added"]), len(result["removed"]), len(result["changed"]),
+            result["unchanged"]))
+        return int(bool(result["added"] or result["removed"] or result["changed"]))
 
     single_cred = None
     password = args.password or os.environ.get("ONVIFSCAN_PASSWORD")
@@ -135,6 +159,8 @@ def main(argv=None):
     report = scrub_secrets(report, secrets)
 
     write_json(report, args.json)
+    if args.csv:
+        write_csv(report, args.csv)
     if not args.no_html:
         with open(args.html, "w", encoding="utf-8") as f:
             f.write(render_html(report, lang=args.lang))
@@ -143,7 +169,8 @@ def main(argv=None):
         print(line)
     if not devices_raw and not args.quiet:
         print(ZERO_RESULT_HINT)
-    print("reports: %s%s" % (args.json, "" if args.no_html else " + " + args.html))
+    print("reports: %s%s%s" % (args.json, "" if args.no_html else " + " + args.html,
+                               " + " + args.csv if args.csv else ""))
     return 0
 
 

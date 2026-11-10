@@ -109,6 +109,60 @@ paths; the JSON and HTML reports are generated the same way:
 PYTHONPATH=src python3 -m onvifscan scan --quiet
 ```
 
+## CSV export and baseline diff
+
+CSV is opt-in; add `--csv PATH` to a scan. It works with `--no-html` and
+`--quiet`; quiet scans still print two lines, with CSV added to the final
+`reports:` line.
+
+```sh
+PYTHONPATH=src python3 -m onvifscan scan --csv inventory.csv --no-html --quiet
+PYTHONPATH=src python3 -m onvifscan diff old.json new.json
+PYTHONPATH=src python3 -m onvifscan diff old.json new.json --json changes.json --quiet
+```
+
+CSV uses UTF-8 with BOM and a fixed header. Each row is one device × Profile;
+a device without Profiles still has one row with empty Profile cells. Missing
+values are empty strings; known zero counts remain `0`. `findings` contains a
+sorted, semicolon-separated set of codes, without detail text. Columns:
+
+```text
+ip,port,mac,manufacturer,model,firmware_version,hostname,level,profile_token,profile_name,media_gen,video_source_token,encoder_options_status,ptz_node_token,preset_count,channel_count,clock_offset_s,findings
+```
+
+Diff reads two existing, scrubbed scan JSON reports offline, without scanning,
+network access or credentials. Both must have `schema: 1` and
+`kind: "onvif_inventory"`. Different `tool_version` values produce a warning on
+stderr, not a device change. Devices match by lowercase MAC, falling back to IP
+only when MAC is absent; duplicate or missing identities are input errors. An
+IP move with the same MAC does not count as a change. Gaining or losing a MAC
+changes the identity key and therefore appears as removed + added.
+
+Only six field classes are compared: firmware, level, Profile token/generation
+pairs, channel count, finding codes and declared service namespaces. Collections
+are sets: order and duplicates do not matter. Timestamps, scan duration, finding
+details and other device/Profile fields are ignored. Diff preserves the scan
+reports' password scrubbing; it does not request secrets to sanitize manually
+edited input files.
+
+The terminal prints `diff: +A -R ~C =U` (added, removed, changed and unchanged
+device counts), including under `--quiet`. No file is created unless `--json OUT`
+is supplied. Diff JSON has `added`/`removed` key arrays, `unchanged` as a count,
+and `changed` entries containing `key`, `identity_basis` (`mac` or `ip`), and
+`changes: [{field, old, new}]`. Field names are JSON-style paths:
+`device_info.FirmwareVersion`, `level`, `profiles`, `channel_count`,
+`findings.code`, `services_declared.namespace`. Profile sets are serialized as
+sorted arrays of `{token, media_gen}` objects. Unknown optional scalar values
+are `null`; absent collections compare as empty sets.
+
+| Exit code | Meaning |
+| --- | --- |
+| 0 | Scan completed normally, or diff found no changes |
+| 1 | Diff found added, removed or changed devices |
+| 2 | Argument/input error, including missing files, invalid JSON or schema/kind mismatch |
+
+For cron, handle diff exit **1 as a change notification, not a failure**.
+
 ## Reading the results
 
 Each device gets a level: **FULL** (identity + profiles), **PARTIAL**
