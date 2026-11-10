@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.0 — 2026-11-11
 
 - Add opt-in `scan --csv PATH`: fixed UTF-8+BOM device × Profile rows, empty
   cells for unknown values, finding code sets without details, and the same
