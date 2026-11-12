@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- Add independent video source enumeration (B3): after profile imaging, query
+  `GetVideoSources` + `GetVideoSourceConfigurations` (Media1) or
+  `GetVideoSourceConfigurations` only (Media2 has no `GetVideoSources`).
+  Both list-all requests are bare operation elements; the Media2 type
+  `tr2:GetConfiguration` only adds optional ConfigurationToken/ProfileToken
+  children (T3, verified against the official Media2 WSDL, as with D1).
+- Report `sources` per device (token, name, name origin, bound-to-profile flag,
+  source configuration tokens) with per-query states
+  (`ok` / `unsupported` / `auth_blocked` / `failed` / `unqueried`); sources
+  with no profile are listed and marked unbound. Evidence only: no NVR or
+  device-type classification. `channel_count` is unchanged (profile-visible
+  source tokens only). CSV gains trailing device-level `source_count` and
+  `unbound_source_count` columns; diff compares a seventh field class,
+  `sources` token sets. See [capability field contract](docs/v0.2-capabilities.md).
+
 ## v0.3.0 — 2026-11-11
 
 - Add opt-in `scan --csv PATH`: fixed UTF-8+BOM device × Profile rows, empty

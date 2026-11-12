@@ -46,7 +46,13 @@ integrator can file or hand to a customer.
    failures is a skewed camera clock, so every authenticated request is
    signed against *device* time), `GetCapabilities` / `GetServices`,
    `GetDeviceInformation`, `GetHostname`, `GetNetworkInterfaces`,
-   Media/Media2 `GetProfiles`, `GetStreamUri`, `GetSnapshotUri`.
+   Media/Media2 `GetProfiles`, `GetStreamUri`, `GetSnapshotUri`,
+   plus per-profile encoder options, PTZ node declarations and preset
+   counts — and, independently of profiles, the physical video sources
+   themselves (`GetVideoSources` / `GetVideoSourceConfigurations`;
+   Media2 has no `GetVideoSources`, so configurations only). Sources with
+   no profile are still listed and marked unbound; multiple sources are
+   evidence only, never a device-type classification.
 3. **Findings, not just fields** — clock skew, information disclosed
    without authentication (loose legacy firmware), XAddr mismatch,
    Media2-only vs legacy-Media devices, rejected credentials, malformed
@@ -127,8 +133,13 @@ values are empty strings; known zero counts remain `0`. `findings` contains a
 sorted, semicolon-separated set of codes, without detail text. Columns:
 
 ```text
-ip,port,mac,manufacturer,model,firmware_version,hostname,level,profile_token,profile_name,media_gen,video_source_token,encoder_options_status,ptz_node_token,preset_count,channel_count,clock_offset_s,findings
+ip,port,mac,manufacturer,model,firmware_version,hostname,level,profile_token,profile_name,media_gen,video_source_token,encoder_options_status,ptz_node_token,preset_count,channel_count,clock_offset_s,findings,source_count,unbound_source_count
 ```
+
+The two trailing device-level columns come from independent source
+enumeration: total visible sources and how many are not bound to any
+profile. `channel_count` is unchanged — it still counts profile-visible
+source tokens only.
 
 Diff reads two existing, scrubbed scan JSON reports offline, without scanning,
 network access or credentials. Both must have `schema: 1` and
@@ -138,8 +149,9 @@ only when MAC is absent; duplicate or missing identities are input errors. An
 IP move with the same MAC does not count as a change. Gaining or losing a MAC
 changes the identity key and therefore appears as removed + added.
 
-Only six field classes are compared: firmware, level, Profile token/generation
-pairs, channel count, finding codes and declared service namespaces. Collections
+Only seven field classes are compared: firmware, level, Profile token/generation
+pairs, channel count, finding codes, declared service namespaces and
+independently enumerated source tokens. Collections
 are sets: order and duplicates do not matter. Timestamps, scan duration, finding
 details and other device/Profile fields are ignored. Diff preserves the scan
 reports' password scrubbing; it does not request secrets to sanitize manually
@@ -151,7 +163,7 @@ is supplied. Diff JSON has `added`/`removed` key arrays, `unchanged` as a count,
 and `changed` entries containing `key`, `identity_basis` (`mac` or `ip`), and
 `changes: [{field, old, new}]`. Field names are JSON-style paths:
 `device_info.FirmwareVersion`, `level`, `profiles`, `channel_count`,
-`findings.code`, `services_declared.namespace`. Profile sets are serialized as
+`findings.code`, `services_declared.namespace`, `sources`. Profile sets are serialized as
 sorted arrays of `{token, media_gen}` objects. Unknown optional scalar values
 are `null`; absent collections compare as empty sets.
 

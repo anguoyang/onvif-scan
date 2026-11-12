@@ -1,4 +1,4 @@
-"""Offline comparison of schema-1 inventories, limited to six field classes.
+"""Offline comparison of schema-1 inventories, limited to seven field classes.
 
 Inputs are the scrubbed JSON inventories produced by scan. No credentials,
 transport, discovery or report serialization belong in this module.
@@ -35,6 +35,8 @@ def _fields(device):
     codes = {_scalar(f.get("code"), (str,)) for f in device.get("findings", [])}
     namespaces = {_scalar(s.get("namespace"), (str,))
                   for s in device.get("services_declared") or []}
+    source_tokens = {_scalar(s.get("token"), (str,))
+                     for s in device.get("sources") or []}
     return {
         "device_info.FirmwareVersion": _scalar(info.get("FirmwareVersion"), (str,)),
         "level": _scalar(device.get("level"), (str,)),
@@ -45,6 +47,7 @@ def _fields(device):
         "channel_count": _scalar(device.get("channel_count"), (int,)),
         "findings.code": sorted(c for c in codes if c is not None),
         "services_declared.namespace": sorted(n for n in namespaces if n is not None),
+        "sources": sorted(t for t in source_tokens if t is not None),
     }
 
 

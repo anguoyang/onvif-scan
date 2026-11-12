@@ -225,7 +225,7 @@ class TestReport(unittest.TestCase):
                       "预置位：ok (—) · 实际数量 2 · 名称 [&#x27;Home&#x27;, &#x27;Gate&#x27;]",
                       "<h4>PTZ 节点声明</h4><p>GetNodes：ok (—)</p>",
                       "预置位容量 (MaximumNumberOfPresets)",
-                      "仅限配置文件可见源；配置名称并非物理源名称。通道数计算依据：video_source。",
+                      "仅限配置文件可见源；独立枚举的源见下。通道数计算依据：video_source。",
                       "<th>流地址（密码已脱敏）</th>",
                       "<p>下一步（流验收）：</p>",
                       "<code>rkdoctor rtsp rtsp://admin:***@192.0.2.10/stream1</code>"):
