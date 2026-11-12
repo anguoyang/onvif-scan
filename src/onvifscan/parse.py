@@ -392,6 +392,59 @@ def parse_ptz_presets(xml):
     return {"count": len(names), "names": names}, malformed
 
 
+def parse_video_sources(xml):
+    """Independent physical inputs (Media1 only; Media2 has no such operation).
+
+    A present but empty response is []; a missing response element is None.
+    """
+    root, malformed = safe_parse(xml)
+    response = next((e for e in root.iter() if local(e) == "GetVideoSourcesResponse"),
+                    None) if root is not None else None
+    if response is None:
+        return None, True
+    sources = []
+    for el in response:
+        if local(el) != "VideoSource":
+            continue
+        res = _child(el, "Resolution")
+        sources.append({
+            "token": el.get("token"), "name": _value(el, "Name"),
+            "framerate": _number(_value(el, "Framerate")),
+            "resolution": ({"width": _number(_value(res, "Width"), True),
+                            "height": _number(_value(res, "Height"), True)}
+                           if res is not None else None),
+        })
+    return sources, malformed
+
+
+def parse_video_source_configurations(xml):
+    """Source configurations in both generations.
+
+    Media1 lists them directly; Media2 wraps them in Configurations elements.
+    SourceToken is the attribute per schema, accepted as a child as well.
+    """
+    root, malformed = safe_parse(xml)
+    response = next((e for e in root.iter()
+                     if local(e) == "GetVideoSourceConfigurationsResponse"),
+                    None) if root is not None else None
+    if response is None:
+        return None, True
+    configs = []
+
+    def _add(el):
+        configs.append({"token": el.get("token"), "name": _value(el, "Name"),
+                        "source_token": el.get("SourceToken") or _value(el, "SourceToken")})
+
+    for el in response:
+        if local(el) == "VideoSourceConfiguration":
+            _add(el)
+        elif local(el) == "Configurations":
+            for sub in el:
+                if local(sub) == "VideoSourceConfiguration":
+                    _add(sub)
+    return configs, malformed
+
+
 def parse_stream_uri(xml):
     root, _m = safe_parse(xml)
     if root is None:

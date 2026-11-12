@@ -35,6 +35,12 @@ BODY_NETIF = '<tds:GetNetworkInterfaces xmlns:tds="%s"/>' % TDS
 BODY_PROFILES1 = '<trt:GetProfiles xmlns:trt="%s"/>' % TRT
 BODY_NODES = '<tptz:GetNodes xmlns:tptz="%s"/>' % TPTZ
 BODY_PROFILES2 = '<tr2:GetProfiles xmlns:tr2="%s"/>' % TR2
+# List-all requests are bare operation elements: Media1 defines no parameters;
+# Media2 GetVideoSourceConfigurations is type tr2:GetConfiguration, whose
+# ConfigurationToken/ProfileToken children are both optional (T3, as with D1).
+BODY_VIDEO_SOURCES = '<trt:GetVideoSources xmlns:trt="%s"/>' % TRT
+BODY_VIDEO_SOURCE_CONFIGS1 = '<trt:GetVideoSourceConfigurations xmlns:trt="%s"/>' % TRT
+BODY_VIDEO_SOURCE_CONFIGS2 = '<tr2:GetVideoSourceConfigurations xmlns:tr2="%s"/>' % TR2
 
 
 def _stream_uri_body(token, ns, tag):
@@ -156,6 +162,8 @@ def scan_device(entry, cred_resolver, timeout=5.0):
         "services": {}, "service_sources": {}, "services_declared": None,
         "profiles": [], "channel_count": 0,
         "channel_count_basis": "profiles",
+        "sources": [], "sources_status": "unqueried",
+        "sources_reason": "no media service route",
         "ptz": {"present": False, "evidence": None,
                 "nodes_status": "unqueried", "nodes_reason": "not reached", "nodes": []},
         "auth": {"mode": "none", "username": None, "result": "not_tried"},
@@ -365,6 +373,82 @@ def scan_device(entry, cred_resolver, timeout=5.0):
                 result = caller.query(ptz_svc, _ptz_body("GetPresets", "ProfileToken", prof["token"]),
                                       P.parse_ptz_presets)
         prof["ptz_presets"] = result
+
+    # Independent source enumeration (B3): sources with no profile are
+    # invisible to the profile pass. Media1 lists sources and their
+    # configurations; Media2 has no GetVideoSources, configurations only.
+    # Evidence only: no NVR/device-type classification is derived here.
+    enumerated = {}
+    config_by_token = {}
+    results = []
+    for gen, svc in ((1, svc_by_gen.get(1)), (2, svc_by_gen.get(2))):
+        if not svc:
+            continue
+        if gen == 1:
+            results.append(("sources", caller.query(
+                svc, BODY_VIDEO_SOURCES, P.parse_video_sources)))
+            results.append(("configs", caller.query(
+                svc, BODY_VIDEO_SOURCE_CONFIGS1, P.parse_video_source_configurations)))
+        else:
+            results.append(("configs", caller.query(
+                svc, BODY_VIDEO_SOURCE_CONFIGS2, P.parse_video_source_configurations)))
+    for kind, result in results:
+        if result["status"] != "ok" or result["data"] is None:
+            continue
+        if kind == "sources":
+            for src in result["data"]:
+                entry = enumerated.setdefault(src["token"], {
+                    "token": src["token"], "name": None, "name_origin": None,
+                    "framerate": None, "resolution": None,
+                    "bound_to_profile": False, "configuration_tokens": []})
+                if src["name"] is not None:
+                    entry["name"] = src["name"]
+                    entry["name_origin"] = "VideoSource.Name"
+                entry["framerate"] = src["framerate"]
+                entry["resolution"] = src["resolution"]
+        else:
+            for cfg in result["data"]:
+                config_by_token[cfg["token"]] = cfg["source_token"]
+                token = cfg["source_token"]
+                if not token:
+                    continue
+                entry = enumerated.setdefault(token, {
+                    "token": token, "name": None, "name_origin": None,
+                    "framerate": None, "resolution": None,
+                    "bound_to_profile": False, "configuration_tokens": []})
+                if cfg["token"] not in entry["configuration_tokens"]:
+                    entry["configuration_tokens"].append(cfg["token"])
+                if entry["name"] is None and cfg["name"] is not None:
+                    entry["name"] = cfg["name"]
+                    entry["name_origin"] = "VideoSourceConfiguration.Name"
+    # A profile is bound to a source directly (its video_source_token) or
+    # indirectly (its source configuration token resolves via enumeration).
+    bound = {p["video_source_token"] for p in profiles if p["video_source_token"]}
+    bound |= {config_by_token[p["source_token"]] for p in profiles
+              if p["source_token"] in config_by_token
+              and config_by_token[p["source_token"]]}
+    for entry in enumerated.values():
+        entry["bound_to_profile"] = entry["token"] in bound
+    rec["sources"] = [enumerated[key] for key in sorted(
+        enumerated, key=lambda t: (t is None, t or ""))]
+    if not results:
+        rec["sources_status"] = "unqueried"
+        rec["sources_reason"] = "no media service route"
+    elif any(r["status"] == "auth_blocked" for _, r in results):
+        rec["sources_status"] = "auth_blocked"
+        rec["sources_reason"] = "authentication gate closed"
+    elif any(r["status"] == "failed" for _, r in results):
+        rec["sources_status"] = "failed"
+        rec["sources_reason"] = "at least one source query failed"
+    elif any(r["status"] != "ok" for _, r in results) and not enumerated:
+        rec["sources_status"] = "unsupported"
+        rec["sources_reason"] = "source enumeration not supported"
+    else:
+        rec["sources_status"] = "ok"
+        rec["sources_reason"] = None
+        problems = sorted({r["status"] for _, r in results if r["status"] != "ok"})
+        if problems:
+            rec["sources_reason"] = "partial coverage: %s" % ", ".join(problems)
 
     # auth result rollup
     if cred:
