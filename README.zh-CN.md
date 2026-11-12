@@ -17,6 +17,12 @@ onvifscan scan --user onvif_user
 v0.2 增加 Profile 可见源关联、Media1/Media2 编码器 options 声明、PTZ 节点声明及
 预置位数量/名称。Media2 options 已按修订 D1 的直接子元素请求形状实现，
 并通过 strict 模拟器端到端测试，保留浮点帧率声明。
+
+未发布版增加独立视频源枚举：与 Profile 无关的物理源也通过
+`GetVideoSources` / `GetVideoSourceConfigurations` 列出并标注未绑定
+（Media2 无 GetVideoSources，只枚举配置）。多源只是证据，不作设备类型推断；
+`channel_count` 仍只计 Profile 可见源。CSV 末尾增加设备级 `source_count` /
+`unbound_source_count` 两列；diff 比对字段由六类增至七类（加 sources token 集合）。
 字段与限制见 [能力字段说明](docs/v0.2-capabilities.md)。
 
 ## 它解决什么
@@ -103,8 +109,11 @@ CSV 使用 UTF-8+BOM 和固定表头，每行是一台设备 × 一个 Profile�
 `findings` 仅含排序、去重后以分号连接的 code，不含 detail。固定列顺序：
 
 ```text
-ip,port,mac,manufacturer,model,firmware_version,hostname,level,profile_token,profile_name,media_gen,video_source_token,encoder_options_status,ptz_node_token,preset_count,channel_count,clock_offset_s,findings
+ip,port,mac,manufacturer,model,firmware_version,hostname,level,profile_token,profile_name,media_gen,video_source_token,encoder_options_status,ptz_node_token,preset_count,channel_count,clock_offset_s,findings,source_count,unbound_source_count
 ```
+
+末尾两列为设备级源统计：可见源总数与未绑定任何配置文件的源数，均来自独立
+源枚举；`channel_count` 不变，仍只计 Profile 可见源。
 
 diff 离线读取两份已经过 scan 擦除密码的 JSON 报告，不扫描、不联网、不取凭据。
 两份输入均须为 `schema: 1`、`kind: "onvif_inventory"`；`tool_version` 不同
@@ -112,8 +121,9 @@ diff 离线读取两份已经过 scan 擦除密码的 JSON 报告，不扫描、
 IP；身份缺失或重复属于输入错误。同 MAC 换 IP 不算变化；从无 MAC 变为有 MAC
 或反向变化会改变身份键，表现为消失＋新增。
 
-只比六类字段：固件版本、level、Profile token/media_gen 对的集合、channel_count、
-findings code 集合、services_declared namespace 集合。集合忽略顺序和重复项。
+只比七类字段：固件版本、level、Profile token/media_gen 对的集合、channel_count、
+findings code 集合、services_declared namespace 集合、独立枚举的 sources token
+集合。集合忽略顺序和重复项。
 生成时间、扫描时长、detail 及其他设备/Profile 字段均不参与比对。diff 保留扫描
 报告已有的密码擦除结果，不索取密码来清洗手工改写的输入文件。
 
