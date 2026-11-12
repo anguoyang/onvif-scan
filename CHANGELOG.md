@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.4.0 — 2026-11-13
 
 - Add independent video source enumeration (B3): after profile imaging, query
   `GetVideoSources` + `GetVideoSourceConfigurations` (Media1) or
