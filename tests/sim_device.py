@@ -38,6 +38,12 @@ PERSONAS = {
                "onvif://www.onvif.org/mac/aa:bb:cc:00:00:01 onvif://www.onvif.org/location/lab",
         profiles=[("MainStream", "H264", 1920, 1080, 25, True),
                   ("SubStream", "H265", 640, 480, 15, False)],
+        video_sources=[{"token": "Sensor_1", "name": "Front", "framerate": 30,
+                        "width": 1920, "height": 1080},
+                       {"token": "Sensor_2", "name": "Side", "framerate": 30,
+                        "width": 1280, "height": 720}],
+        video_source_configurations=[{"token": "VS_1", "source_token": "Sensor_1", "name": "VS"},
+                                     {"token": "VS_2", "source_token": "Sensor_2", "name": "VS2"}],
     ),
     "legacy": dict(
         port=18082, disc_port=37022, manufacturer="OldBrand (sim)", model="OC-10",
@@ -46,6 +52,9 @@ PERSONAS = {
         stream_uri_with_creds=False, source_tokens=False,
         scopes="onvif://www.onvif.org/Profile/Streaming",
         profiles=[("Profile_1", "H264", 2560, 1440, 20, False)],
+        video_sources=[{"token": "Sensor_1", "name": "Front", "framerate": 20,
+                        "width": 2560, "height": 1440}],
+        video_source_configurations=[{"token": "VS_1", "source_token": "Sensor_1", "name": "VS"}],
     ),
     "strict": dict(
         port=18083, disc_port=37023, manufacturer="SecureEye (sim)", model="SE-9",
@@ -57,6 +66,12 @@ PERSONAS = {
                "onvif://www.onvif.org/mac/aa:bb:cc:00:00:03",
         profiles=[("profile_0_h264", "H264", 1920, 1080, 30, True),
                   ("profile_0_h265", "H265", 1920, 1080, 30, True)],
+        video_sources=[{"token": "Sensor_1", "name": "Front", "framerate": 30,
+                        "width": 1920, "height": 1080},
+                       {"token": "Sensor_2", "name": "Side", "framerate": 30,
+                        "width": 1280, "height": 720}],
+        video_source_configurations=[{"token": "VS_1", "source_token": "Sensor_1", "name": "VS"},
+                                     {"token": "VS_2", "source_token": "Sensor_2", "name": "VS2"}],
     ),
 }
 
@@ -131,6 +146,29 @@ def encoder_options_response(media2=False):
                       codec_options, codec_options, bitrate))
     return envelope('<m:GetVideoEncoderConfigurationOptionsResponse xmlns:m="%s" xmlns:tt="%s">'
                     '%s</m:GetVideoEncoderConfigurationOptionsResponse>' % (ns, TT, options))
+
+
+def video_sources_response(p, media2=False):
+    ns = "http://www.onvif.org/ver%s/media/wsdl" % ("20" if media2 else "10")
+    items = "".join(
+        '<tt:VideoSource token="%s"><tt:Name>%s</tt:Name><tt:Framerate>%s</tt:Framerate>'
+        '<tt:Resolution><tt:Width>%d</tt:Width><tt:Height>%d</tt:Height></tt:Resolution>'
+        '</tt:VideoSource>' % (s["token"], s["name"], s["framerate"], s["width"], s["height"])
+        for s in p.get("video_sources", []))
+    return envelope('<m:GetVideoSourcesResponse xmlns:m="%s" xmlns:tt="%s">%s'
+                    '</m:GetVideoSourcesResponse>' % (ns, TT, items))
+
+
+def video_source_configurations_response(p, media2=False):
+    ns = "http://www.onvif.org/ver%s/media/wsdl" % ("20" if media2 else "10")
+    items = "".join(
+        '<tt:VideoSourceConfiguration token="%s" SourceToken="%s"><tt:Name>%s</tt:Name>'
+        '</tt:VideoSourceConfiguration>' % (c["token"], c["source_token"], c["name"])
+        for c in p.get("video_source_configurations", []))
+    if media2:
+        items = "<tr2:Configurations>%s</tr2:Configurations>" % items
+    return envelope('<m:GetVideoSourceConfigurationsResponse xmlns:m="%s" xmlns:tt="%s">%s'
+                    '</m:GetVideoSourceConfigurationsResponse>' % (ns, TT, items))
 
 
 def ptz_node_xml(token="PTZNode", capacity=80, home=True, tours=2):
@@ -266,6 +304,23 @@ def handle_soap(p, path, raw):
                               for n in selected)
         return 200, envelope('<t:%sResponse xmlns:t="%s" xmlns:tt="%s">%s</t:%sResponse>'
                              % (op, ns, TT, payload, op))
+    if op in ("GetVideoSources", "GetVideoSourceConfigurations"):
+        ns = "http://www.onvif.org/ver%s/media/wsdl" % ("20" if p["media2"] else "10")
+        service_path = "/onvif/media2" if p["media2"] else "/onvif/Media"
+        request = list(body)[0]
+        children = list(request)
+        # List-all requests are bare operation elements: Media1 defines no
+        # parameters; the Media2 type tr2:GetConfiguration only adds optional
+        # ConfigurationToken/ProfileToken children (T3, as with D1).
+        if (operation != "{%s}%s" % (ns, op) or path != service_path or children):
+            return 400, fault("invalid source request", "InvalidArgVal")
+        if op == "GetVideoSources" and p["media2"]:
+            return 400, fault("GetVideoSources is not defined in Media2", "ActionNotSupported")
+        if not check_auth(p, root):
+            return 401, fault()
+        if op == "GetVideoSources":
+            return 200, video_sources_response(p, p["media2"])
+        return 200, video_source_configurations_response(p, p["media2"])
     if op == "GetVideoEncoderConfigurationOptions":
         ns = "http://www.onvif.org/ver%s/media/wsdl" % ("20" if p["media2"] else "10")
         service_path = "/onvif/media2" if p["media2"] else "/onvif/Media"
