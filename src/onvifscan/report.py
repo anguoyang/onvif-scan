@@ -57,7 +57,7 @@ CSV_COLUMNS = (
     "ip", "port", "mac", "manufacturer", "model", "firmware_version", "hostname",
     "level", "profile_token", "profile_name", "media_gen", "video_source_token",
     "encoder_options_status", "ptz_node_token", "preset_count", "channel_count",
-    "clock_offset_s", "findings",
+    "clock_offset_s", "findings", "source_count", "unbound_source_count",
 )
 
 
@@ -74,6 +74,9 @@ def write_csv(report, path):
             info = device.get("device_info") or {}
             codes = sorted({finding["code"] for finding in device.get("findings", [])
                             if finding.get("code")})
+            sources = device.get("sources") or []
+            source_count = len(sources)
+            unbound = sum(1 for s in sources if not s.get("bound_to_profile"))
             for profile in device.get("profiles") or [{}]:
                 presets = (profile.get("ptz_presets") or {}).get("data") or {}
                 writer.writerow((
@@ -85,7 +88,7 @@ def write_csv(report, path):
                     (profile.get("encoder_options") or {}).get("status"),
                     profile.get("ptz_node_token"), presets.get("count"),
                     device.get("channel_count"), (device.get("clock") or {}).get("offset_s"),
-                    ";".join(codes),
+                    ";".join(codes), source_count, unbound,
                 ))
 
 
@@ -282,28 +285,54 @@ def render_html(report, lang: str = "en"):
             find_items = "".join("<li><b>%s</b> (%s) — %s</li>" % (
                 _esc(f["code"]), _esc(f["severity"]), _esc(f["detail"])) for f in d["findings"])
         steps = "".join("<li><code>%s</code></li>" % _esc(x) for x in d["next_steps"])
+        sources = d.get("sources") or []
+        unbound = sum(1 for s in sources if not s.get("bound_to_profile"))
+        if sources:
+            src_rows = "".join(
+                "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (
+                    _esc(s.get("token")), _esc(s.get("name")), _esc(s.get("name_origin")),
+                    _esc(("是" if s.get("bound_to_profile") else "否") if zh
+                         else ("yes" if s.get("bound_to_profile") else "no")),
+                    _esc(", ".join(s.get("configuration_tokens") or []))) for s in sources)
+            sources_html = (
+                ("<p>可见视频源 %d 个，其中 %d 个未绑定任何配置文件。"
+                 "多源也可能是多传感器相机，不作设备类型推断。</p>"
+                 "<table><tr><th>源令牌</th><th>名称</th><th>名称来源</th>"
+                 "<th>已绑定配置文件</th><th>源配置令牌</th></tr>%s</table>" if zh else
+                 "<p>Visible video sources: %d, of which %d are not bound to any profile. "
+                 "Multiple sources may also be a multi-sensor camera; no device-type "
+                 "inference is made.</p>"
+                 "<table><tr><th>source token</th><th>name</th><th>name origin</th>"
+                 "<th>bound to a profile</th><th>source configuration tokens</th></tr>%s</table>")
+                % (len(sources), unbound, src_rows))
+        elif d.get("sources_status") == "ok":
+            sources_html = "<p>可见视频源 0 个。</p>" if zh else "<p>Visible video sources: 0.</p>"
+        else:
+            sources_html = ("<p>视频源：%s（%s）</p>" if zh else
+                            "<p>Video sources: %s (%s)</p>") % (
+                _esc(d.get("sources_status", "unqueried")), _esc(d.get("sources_reason")))
         details.append(
             ("<h3>%s — %s %s</h3><p>级别 %s · MAC %s (%s) · 时钟偏移 %s s · "
-             "鉴权 %s/%s · 序列号 %s</p>%s%s%s%s" if zh else
+             "鉴权 %s/%s · 序列号 %s</p>%s%s%s%s%s" if zh else
              "<h3>%s — %s %s</h3><p>level %s · MAC %s (%s) · clock offset %s s · "
-             "auth %s/%s · serial %s</p>%s%s%s%s") % (
+             "auth %s/%s · serial %s</p>%s%s%s%s%s") % (
                 _esc(d.get("ip")), _esc(info.get("Manufacturer")), _esc(info.get("Model")),
                 _esc(d["level"]), _esc(d.get("mac")), _esc(d.get("mac_source")),
                 _esc(d["clock"].get("offset_s")), _esc(d["auth"]["mode"]),
                 _esc(d["auth"]["result"]), _esc(info.get("SerialNumber")),
                 service_html + profile_details,
-                (("<p>仅限配置文件可见源；配置名称并非物理源名称。"
-                  "通道数计算依据：%s。</p>"
+                (("<p>仅限配置文件可见源；独立枚举的源见下。通道数计算依据：%s。</p>"
                   "<table><tr><th>配置文件</th><th>视频源令牌</th><th>源配置令牌</th>"
                   "<th>配置名称（来源）</th><th>编码</th><th>分辨率</th>"
                   "<th>帧率</th><th>流地址（密码已脱敏）</th></tr>%s</table>" if zh else
-                  "<p>Profile-visible sources only; configuration names are not physical source names. "
-                  "Legacy channel count basis: %s.</p>"
+                  "<p>Profile-visible sources only; independently enumerated sources are "
+                  "listed below. Legacy channel count basis: %s.</p>"
                   "<table><tr><th>profile</th><th>source token</th><th>source configuration token</th>"
                   "<th>configuration name (origin)</th><th>codec</th><th>size</th>"
                   "<th>fps</th><th>stream (password masked)</th></tr>%s</table>") %
                  (_esc(d.get("channel_count_basis")), prof_rows))
                 if prof_rows else "",
+                sources_html,
                 ("<ul>%s</ul>" % find_items) if find_items else "",
                 (("<p>下一步（流验收）：</p><ul>%s</ul>" if zh else
                   "<p>Next step (stream acceptance):</p><ul>%s</ul>") % steps) if steps else ""))
