@@ -205,7 +205,7 @@ simulation-verified, not field-verified.
 [RK Edge Doctor](https://github.com/anguoyang/rk-edge-doctor)) answers
 *whether a given stream is healthy*. Together they cover a camera
 acceptance workflow: inventory the fleet, then acceptance-test each
-stream. A [Site AI Gateway](https://site-ai-gateway.com) open-source tool
+stream. An open-source tool
 for security and parking integrators.
 
 ## License

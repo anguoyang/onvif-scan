@@ -163,8 +163,7 @@ issue，是目前最有价值的贡献。在第一批真机报告落地前，厂
 ## 与 RK Edge Doctor 的关系
 
 onvif-scan 回答「网里有什么」，`rkdoctor rtsp` 回答「这条流健不健康」，
-两者组成摄像头验收链。[Site AI Gateway](https://site-ai-gateway.com)
-面向安防与停车集成商的开源工具。
+两者组成摄像头验收链。面向安防与停车集成商的开源工具。
 
 ## 许可证
 
