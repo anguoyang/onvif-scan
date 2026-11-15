@@ -58,6 +58,7 @@ CSV_COLUMNS = (
     "level", "profile_token", "profile_name", "media_gen", "video_source_token",
     "encoder_options_status", "ptz_node_token", "preset_count", "channel_count",
     "clock_offset_s", "findings", "source_count", "unbound_source_count",
+    "event_topic_count", "recording_count",
 )
 
 
@@ -77,6 +78,11 @@ def write_csv(report, path):
             sources = device.get("sources") or []
             source_count = len(sources)
             unbound = sum(1 for s in sources if not s.get("bound_to_profile"))
+            topics = ((device.get("events") or {}).get("data") or {}).get("topics")
+            topic_count = len(topics) if isinstance(topics, list) else None
+            summary_data = ((device.get("recording") or {}).get("summary")
+                            or {}).get("data") or {}
+            recording_count = summary_data.get("number_recordings")
             for profile in device.get("profiles") or [{}]:
                 presets = (profile.get("ptz_presets") or {}).get("data") or {}
                 writer.writerow((
@@ -89,6 +95,7 @@ def write_csv(report, path):
                     profile.get("ptz_node_token"), presets.get("count"),
                     device.get("channel_count"), (device.get("clock") or {}).get("offset_s"),
                     ";".join(codes), source_count, unbound,
+                    topic_count, recording_count,
                 ))
 
 
@@ -311,11 +318,76 @@ def render_html(report, lang: str = "en"):
             sources_html = ("<p>视频源：%s（%s）</p>" if zh else
                             "<p>Video sources: %s (%s)</p>") % (
                 _esc(d.get("sources_status", "unqueried")), _esc(d.get("sources_reason")))
+        imaging = d.get("imaging") or {}
+        imaging_html = "<h4>成像设置 (Imaging)</h4>" if zh else "<h4>Imaging</h4>"
+        if imaging.get("sources"):
+            for source in imaging["sources"]:
+                settings = source.get("settings") or {}
+                options = source.get("options") or {}
+                imaging_html += (
+                    "<p>源 %s · 设置 %s (%s) · 选项 %s (%s)</p>" if zh else
+                    "<p>Source %s · settings %s (%s) · options %s (%s)</p>"
+                ) % (
+                    _esc(source.get("source_token")),
+                    _esc(settings.get("status", "unqueried")), _esc(settings.get("reason")),
+                    _esc(options.get("status", "unqueried")), _esc(options.get("reason")))
+                for result, label in ((settings, "设置" if zh else "Settings"),
+                                      (options, "选项" if zh else "Options")):
+                    if result.get("data") is not None:
+                        imaging_html += "<p>%s</p><dl>%s</dl>" % (
+                            label, "".join(
+                                "<dt>%s</dt><dd>%s</dd>" % (
+                                    _esc(key), _esc(json.dumps(value, ensure_ascii=False)))
+                                for key, value in result["data"].items()))
+        else:
+            imaging_html += ("<p>成像设置：%s（%s）</p>" if zh else
+                             "<p>Imaging: %s (%s)</p>") % (
+                _esc(imaging.get("status", "unqueried")), _esc(imaging.get("reason")))
+        events = d.get("events") or {}
+        events_html = "<h4>事件能力 (Events)</h4>" if zh else "<h4>Events</h4>"
+        if events.get("data") is not None:
+            events_html += (
+                "<p>主题命名空间：%s</p><p>固定主题集 (FixedTopicSet)：%s</p>"
+                "<p>主题：%s</p>" if zh else
+                "<p>Topic namespaces: %s</p><p>FixedTopicSet: %s</p><p>Topics: %s</p>"
+            ) % (
+                _esc(", ".join(events["data"].get("topic_namespaces") or [])),
+                _esc(events["data"].get("fixed_topic_set")),
+                _esc(", ".join(events["data"].get("topics") or [])))
+        else:
+            events_html += ("<p>事件能力：%s（%s）</p>" if zh else
+                            "<p>Events: %s (%s)</p>") % (
+                _esc(events.get("status", "unqueried")), _esc(events.get("reason")))
+        recording = d.get("recording") or {}
+        jobs = recording.get("jobs") or {}
+        summary_query = recording.get("summary") or {}
+        recording_html = "<h4>录像盘点 (Recording)</h4>" if zh else "<h4>Recording</h4>"
+        if jobs.get("data") is not None:
+            recording_html += (
+                "<p>录像任务：%s 个 · 状态 %s</p>" if zh else
+                "<p>Recording jobs: %s · states %s</p>"
+            ) % (
+                _esc(jobs["data"].get("job_count")),
+                _esc(", ".join(str(state) for state in jobs["data"].get("states") or []
+                               if state is not None)))
+        else:
+            recording_html += ("<p>录像任务：%s（%s）</p>" if zh else
+                               "<p>Recording jobs: %s (%s)</p>") % (
+                _esc(jobs.get("status", "unqueried")), _esc(jobs.get("reason")))
+        if summary_query.get("data") is not None:
+            recording_html += "<dl>%s</dl>" % "".join(
+                "<dt>%s</dt><dd>%s</dd>" % (_esc(key), _esc(value))
+                for key, value in summary_query["data"].items())
+        else:
+            recording_html += ("<p>录像汇总：%s（%s）</p>" if zh else
+                               "<p>Recording summary: %s (%s)</p>") % (
+                _esc(summary_query.get("status", "unqueried")),
+                _esc(summary_query.get("reason")))
         details.append(
             ("<h3>%s — %s %s</h3><p>级别 %s · MAC %s (%s) · 时钟偏移 %s s · "
-             "鉴权 %s/%s · 序列号 %s</p>%s%s%s%s%s" if zh else
+             "鉴权 %s/%s · 序列号 %s</p>%s%s%s%s%s%s%s%s" if zh else
              "<h3>%s — %s %s</h3><p>level %s · MAC %s (%s) · clock offset %s s · "
-             "auth %s/%s · serial %s</p>%s%s%s%s%s") % (
+             "auth %s/%s · serial %s</p>%s%s%s%s%s%s%s%s") % (
                 _esc(d.get("ip")), _esc(info.get("Manufacturer")), _esc(info.get("Model")),
                 _esc(d["level"]), _esc(d.get("mac")), _esc(d.get("mac_source")),
                 _esc(d["clock"].get("offset_s")), _esc(d["auth"]["mode"]),
@@ -333,6 +405,9 @@ def render_html(report, lang: str = "en"):
                  (_esc(d.get("channel_count_basis")), prof_rows))
                 if prof_rows else "",
                 sources_html,
+                imaging_html,
+                events_html,
+                recording_html,
                 ("<ul>%s</ul>" % find_items) if find_items else "",
                 (("<p>下一步（流验收）：</p><ul>%s</ul>" if zh else
                   "<p>Next step (stream acceptance):</p><ul>%s</ul>") % steps) if steps else ""))
