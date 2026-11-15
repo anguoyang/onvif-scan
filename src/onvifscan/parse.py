@@ -107,7 +107,8 @@ def parse_capabilities(xml):
 _NS_TO_KEY = {"ver10/media": "media", "ver20/media": "media2",
               "ver20/ptz": "ptz", "ver10/ptz": "ptz", "ver10/device": "device",
               "ver10/events": "events", "ver20/imaging": "imaging",
-              "ver10/recording": "recording"}
+              "ver10/recording": "recording", "ver10/search": "search",
+              "ver10/replay": "replay"}
 
 
 def parse_services(xml):
@@ -443,6 +444,127 @@ def parse_video_source_configurations(xml):
                 if local(sub) == "VideoSourceConfiguration":
                     _add(sub)
     return configs, malformed
+
+
+_IMAGING_FIELDS = (("Brightness", "brightness"),
+                   ("ColorSaturation", "color_saturation"),
+                   ("Contrast", "contrast"), ("Sharpness", "sharpness"))
+_IMAGING_MODES = (("Exposure", "exposure_mode"),
+                  ("WhiteBalance", "white_balance_mode"),
+                  ("BacklightCompensation", "backlight_compensation_mode"),
+                  ("WideDynamicRange", "wide_dynamic_range_mode"))
+
+
+def parse_imaging_settings(xml):
+    """Present-only flat extraction from a GetImagingSettings response.
+
+    Only values the device actually returned are included; a response with
+    none of the known fields (or no response element at all) is None.
+    """
+    root, malformed = safe_parse(xml)
+    response = next((e for e in root.iter() if local(e) == "GetImagingSettingsResponse"),
+                    None) if root is not None else None
+    if response is None:
+        return None, True
+    settings = next((e for e in response.iter() if local(e) == "ImagingSettings"),
+                    response)
+    out = {}
+    for element, key in _IMAGING_FIELDS:
+        value = _number(_value(settings, element))
+        if value is not None:
+            out[key] = value
+    for element, key in _IMAGING_MODES:
+        holder = _child(settings, element)
+        mode = _value(holder, "Mode") if holder is not None else None
+        if mode is not None:
+            out[key] = mode
+    ir_cut = _value(settings, "IrCutFilter")
+    if ir_cut is not None:
+        out["ir_cut_filter"] = ir_cut
+    focus = _child(settings, "Focus")
+    auto_focus = _value(focus, "AutoFocusMode") if focus is not None else None
+    if auto_focus is not None:
+        out["auto_focus_mode"] = auto_focus
+    return (out or None), malformed
+
+
+def parse_imaging_options(xml):
+    """Float ranges for the numeric imaging fields, present-only.
+
+    Mirrors parse_imaging_settings keys; ranges with neither bound usable
+    are dropped, and a response with no usable range at all is None.
+    """
+    root, malformed = safe_parse(xml)
+    response = next((e for e in root.iter() if local(e) == "GetOptionsResponse"),
+                    None) if root is not None else None
+    if response is None:
+        return None, True
+    options = next((e for e in response.iter() if local(e) == "Options"), response)
+    out = {}
+    for element, key in _IMAGING_FIELDS:
+        rng = _range(options, element)
+        if rng is not None and (rng["min"] is not None or rng["max"] is not None):
+            out[key] = rng
+    return (out or None), malformed
+
+
+def parse_event_properties(xml):
+    """Event service declarations from a GetEventProperties response.
+
+    Topic names are the local names of the TopicSet's direct children only.
+    Declarations are evidence; nothing is subscribed or created. A response
+    with no namespaces, no fixed-set flag and no topics is None.
+    """
+    root, malformed = safe_parse(xml)
+    response = next((e for e in root.iter() if local(e) == "GetEventPropertiesResponse"),
+                    None) if root is not None else None
+    if response is None:
+        return None, True
+    namespaces = [(el.text or "").strip() for el in response.iter()
+                  if local(el) == "TopicNamespaceLocation" and (el.text or "").strip()]
+    fixed = _boolean(_value(response, "FixedTopicSet"))
+    topic_set = next((e for e in response.iter() if local(e) == "TopicSet"), None)
+    topics = sorted({local(child) for child in topic_set}) if topic_set is not None else []
+    if not namespaces and fixed is None and not topics:
+        return None, malformed
+    return {"topic_namespaces": namespaces, "fixed_topic_set": fixed,
+            "topics": topics}, malformed
+
+
+def parse_recording_jobs(xml):
+    """Job count and per-job State text only — never any token (T5).
+
+    A usable response with no job items is valid data (zero jobs), not
+    None; only a missing response element is unknown.
+    """
+    root, malformed = safe_parse(xml)
+    response = next((e for e in root.iter() if local(e) == "GetRecordingJobsResponse"),
+                    None) if root is not None else None
+    if response is None:
+        return None, True
+    items = [el for el in response if local(el) == "JobItem"] or list(response)
+    states = [first_text(item, "State") for item in items]
+    return {"job_count": len(states), "states": states}, malformed
+
+
+def parse_recording_summary(xml):
+    """Recording summary figures, present-only; counts come out as ints."""
+    root, malformed = safe_parse(xml)
+    response = next((e for e in root.iter() if local(e) == "GetRecordingSummaryResponse"),
+                    None) if root is not None else None
+    if response is None:
+        return None, True
+    out = {}
+    for element, key in (("DataFrom", "data_from"), ("DataUntil", "data_until")):
+        value = first_text(response, element)
+        if value is not None:
+            out[key] = value
+    for element, key in (("NumberRecordings", "number_recordings"),
+                         ("NumberRecordingsFailed", "number_recordings_failed")):
+        value = _number(first_text(response, element), True)
+        if value is not None:
+            out[key] = value
+    return (out or None), malformed
 
 
 def parse_stream_uri(xml):

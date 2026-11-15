@@ -23,6 +23,10 @@ TDS = "http://www.onvif.org/ver10/device/wsdl"
 TRT = "http://www.onvif.org/ver10/media/wsdl"
 TR2 = "http://www.onvif.org/ver20/media/wsdl"
 TPTZ = "http://www.onvif.org/ver20/ptz/wsdl"
+TIMG = "http://www.onvif.org/ver20/imaging/wsdl"
+TEV = "http://www.onvif.org/ver10/events/wsdl"
+TRC = "http://www.onvif.org/ver10/recording/wsdl"
+TSE = "http://www.onvif.org/ver10/search/wsdl"
 
 BODY_TIME = '<tds:GetSystemDateAndTime xmlns:tds="%s"/>' % TDS
 BODY_CAPS = ('<tds:GetCapabilities xmlns:tds="%s"><tds:Category>All</tds:Category>'
@@ -41,6 +45,17 @@ BODY_PROFILES2 = '<tr2:GetProfiles xmlns:tr2="%s"/>' % TR2
 BODY_VIDEO_SOURCES = '<trt:GetVideoSources xmlns:trt="%s"/>' % TRT
 BODY_VIDEO_SOURCE_CONFIGS1 = '<trt:GetVideoSourceConfigurations xmlns:trt="%s"/>' % TRT
 BODY_VIDEO_SOURCE_CONFIGS2 = '<tr2:GetVideoSourceConfigurations xmlns:tr2="%s"/>' % TR2
+# Parameterless operations are bare elements (event/recording/search WSDLs
+# define empty sequences for these, as verified in the v0.5 inventory).
+BODY_EVENT_PROPERTIES = '<tev:GetEventProperties xmlns:tev="%s"/>' % TEV
+BODY_RECORDING_JOBS = '<trc:GetRecordingJobs xmlns:trc="%s"/>' % TRC
+BODY_RECORDING_SUMMARY = '<tse:GetRecordingSummary xmlns:tse="%s"/>' % TSE
+
+
+def _imaging_body(operation, token):
+    return ('<timg:{op} xmlns:timg="{ns}"><timg:VideoSourceToken>{token}'
+            '</timg:VideoSourceToken></timg:{op}>').format(
+                op=operation, ns=TIMG, token=escape(token))
 
 
 def _stream_uri_body(token, ns, tag):
@@ -164,6 +179,14 @@ def scan_device(entry, cred_resolver, timeout=5.0):
         "channel_count_basis": "profiles",
         "sources": [], "sources_status": "unqueried",
         "sources_reason": "no media service route",
+        "imaging": {"status": "unqueried", "reason": "no imaging service route",
+                    "sources": []},
+        "events": {"status": "unqueried", "reason": "no events service route",
+                   "data": None},
+        "recording": {"jobs": {"status": "unqueried",
+                                "reason": "no recording service route", "data": None},
+                      "summary": {"status": "unqueried",
+                                  "reason": "no search service route", "data": None}},
         "ptz": {"present": False, "evidence": None,
                 "nodes_status": "unqueried", "nodes_reason": "not reached", "nodes": []},
         "auth": {"mode": "none", "username": None, "result": "not_tried"},
@@ -449,6 +472,61 @@ def scan_device(entry, cred_resolver, timeout=5.0):
         problems = sorted({r["status"] for _, r in results if r["status"] != "ok"})
         if problems:
             rec["sources_reason"] = "partial coverage: %s" % ", ".join(problems)
+
+    # Imaging settings/options per video source (v0.5): the source set is
+    # the independent enumeration union every profile's video_source_token,
+    # deduplicated, no silent cap, each query's status recorded (T2).
+    # Evidence only, like the sources section; nothing is ever set.
+    imaging_svc = services.get("imaging")
+    if imaging_svc:
+        tokens = {s["token"] for s in rec["sources"] if s.get("token")}
+        tokens |= {p["video_source_token"] for p in profiles if p["video_source_token"]}
+        imaging = rec["imaging"]
+        if not tokens:
+            imaging["reason"] = "no video source tokens known"
+        else:
+            results = []
+            for token in sorted(tokens):
+                settings = caller.query(imaging_svc,
+                                        _imaging_body("GetImagingSettings", token),
+                                        P.parse_imaging_settings)
+                options = caller.query(imaging_svc,
+                                       _imaging_body("GetOptions", token),
+                                       P.parse_imaging_options)
+                results.extend((settings, options))
+                imaging["sources"].append({"source_token": token,
+                                           "settings": settings, "options": options})
+            if any(r["status"] == "auth_blocked" for r in results):
+                imaging.update(status="auth_blocked",
+                               reason="authentication gate closed")
+            elif any(r["status"] == "failed" for r in results):
+                imaging.update(status="failed",
+                               reason="at least one imaging query failed")
+            elif all(r["status"] == "unsupported" for r in results):
+                imaging.update(status="unsupported",
+                               reason="imaging queries not supported")
+            elif any(r["status"] != "ok" for r in results):
+                problems = sorted({r["status"] for r in results if r["status"] != "ok"})
+                imaging.update(status="ok",
+                               reason="partial coverage: %s" % ", ".join(problems))
+            else:
+                imaging.update(status="ok", reason=None)
+
+    # Event capability declarations (v0.5): GetEventProperties only — the
+    # declared topic set is evidence; no subscription is ever created.
+    if services.get("events"):
+        rec["events"] = caller.query(services["events"], BODY_EVENT_PROPERTIES,
+                                     P.parse_event_properties)
+
+    # Recording inventory (v0.5): job count/states via the recording service
+    # and the recording summary via the search service. The parsers never
+    # extract job or recording tokens (T5).
+    if services.get("recording"):
+        rec["recording"]["jobs"] = caller.query(
+            services["recording"], BODY_RECORDING_JOBS, P.parse_recording_jobs)
+    if services.get("search"):
+        rec["recording"]["summary"] = caller.query(
+            services["search"], BODY_RECORDING_SUMMARY, P.parse_recording_summary)
 
     # auth result rollup
     if cred:
