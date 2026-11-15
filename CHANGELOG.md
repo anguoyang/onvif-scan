@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.5.0 — 2026-11-15
+
+Final feature release; the project enters maintenance mode after this
+version (external pull requests and real-device reports still welcome).
+
+- Add per-source imaging inventory: `GetImagingSettings` + `GetOptions`
+  against the Imaging service for every known video source token
+  (enumerated sources union profile source tokens), each query
+  status-bearing like encoder options. Settings are present-only flat
+  values (brightness/contrast/sharpness/saturation, exposure and
+  white-balance modes, IR cut filter, wide dynamic range, backlight
+  compensation, auto-focus mode); options carry {min, max} ranges for
+  the numeric fields. Request shapes verified against the official
+  imaging WSDL (single `VideoSourceToken` child, as with D1/T3).
+- Add event capability declarations: one `GetEventProperties` call
+  (bare element; no subscription is ever created) reporting topic
+  namespaces, the fixed-topic-set flag and declared TopicSet topics.
+- Add recording inventory: `GetRecordingJobs` on the Recording service
+  (job count and states only — job/recording tokens are never exported)
+  and `GetRecordingSummary` on the Search service (time range and
+  recording counts). Both requests are bare elements per the official
+  WSDLs at onvif.org/ver10/recording.wsdl and ver10/search.wsdl.
+- Report JSON gains `imaging` / `events` / `recording` sections and the
+  HTML report shows them after the sources section (English and
+  zh-CN). CSV gains trailing device-level `event_topic_count` and
+  `recording_count` columns. GetServices routing now also recognises
+  the Search and Replay namespaces. Schema stays 1, diff field classes
+  and findings are unchanged. See
+  [capability field contract](docs/v0.2-capabilities.md).
+
 ## v0.4.0 — 2026-11-13
 
 - Add independent video source enumeration (B3): after profile imaging, query

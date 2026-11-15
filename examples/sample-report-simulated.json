@@ -1,8 +1,8 @@
 {
  "schema": 1,
  "kind": "onvif_inventory",
- "tool_version": "0.2.0",
- "generated_at": "2026-11-08T00:07:06+00:00",
+ "tool_version": "0.5.0",
+ "generated_at": "2026-11-15T14:50:06+09:00",
  "scan": {
   "interfaces": [
    "lo (simulated)"
@@ -26,11 +26,11 @@
  "devices": [
   {
    "ip": "127.0.0.1",
-   "port": 39253,
+   "port": 46481,
    "endpoint": null,
    "types": null,
    "xaddrs": [
-    "http://127.0.0.1:39253/onvif/device_service"
+    "http://127.0.0.1:46481/onvif/device_service"
    ],
    "source_ips": [
     "127.0.0.1"
@@ -61,26 +61,32 @@
     "prefix": 8
    },
    "clock": {
-    "device_time": "2026-11-08T00:07:08+00:00",
-    "offset_s": 1.8,
+    "device_time": "2026-11-15T05:50:08+00:00",
+    "offset_s": 1.1,
     "skew": false
    },
    "services": {
-    "device": "http://127.0.0.1:39253/onvif/device_service",
-    "media": "http://127.0.0.1:39253/onvif/Media",
-    "ptz": "http://127.0.0.1:39253/onvif/PTZ",
-    "events": "http://127.0.0.1:39253/onvif/Events"
+    "device": "http://127.0.0.1:46481/onvif/device_service",
+    "media": "http://127.0.0.1:46481/onvif/Media",
+    "ptz": "http://127.0.0.1:46481/onvif/PTZ",
+    "imaging": "http://127.0.0.1:46481/onvif/Imaging",
+    "events": "http://127.0.0.1:46481/onvif/Events",
+    "recording": "http://127.0.0.1:46481/onvif/Recording",
+    "search": "http://127.0.0.1:46481/onvif/Search"
    },
    "service_sources": {
     "device": "GetCapabilities",
     "media": "GetCapabilities",
     "ptz": "GetCapabilities",
-    "events": "GetServices"
+    "imaging": "GetServices",
+    "events": "GetServices",
+    "recording": "GetServices",
+    "search": "GetServices"
    },
    "services_declared": [
     {
      "namespace": "http://www.onvif.org/ver10/device/wsdl",
-     "xaddr": "http://127.0.0.1:39253/onvif/device_service",
+     "xaddr": "http://127.0.0.1:46481/onvif/device_service",
      "version": {
       "major": 2,
       "minor": 6
@@ -90,7 +96,7 @@
     },
     {
      "namespace": "http://www.onvif.org/ver10/media/wsdl",
-     "xaddr": "http://127.0.0.1:39253/onvif/Media",
+     "xaddr": "http://127.0.0.1:46481/onvif/Media",
      "version": {
       "major": 2,
       "minor": 6
@@ -100,17 +106,7 @@
     },
     {
      "namespace": "http://www.onvif.org/ver20/ptz/wsdl",
-     "xaddr": "http://127.0.0.1:39253/onvif/PTZ",
-     "version": {
-      "major": 2,
-      "minor": 6
-     },
-     "missing_fields": [],
-     "invalid_fields": []
-    },
-    {
-     "namespace": "http://www.onvif.org/ver10/events/wsdl",
-     "xaddr": "http://127.0.0.1:39253/onvif/Events",
+     "xaddr": "http://127.0.0.1:46481/onvif/PTZ",
      "version": {
       "major": 2,
       "minor": 6
@@ -120,7 +116,7 @@
     },
     {
      "namespace": "urn:fictional:sim:extra",
-     "xaddr": "http://127.0.0.1:39253/onvif/Extra",
+     "xaddr": "http://127.0.0.1:46481/onvif/Extra",
      "version": {
       "major": 2,
       "minor": 6
@@ -130,7 +126,47 @@
     },
     {
      "namespace": "http://www.onvif.org/ver10/media/wsdl",
-     "xaddr": "http://127.0.0.1:39253/onvif/MediaAlternate",
+     "xaddr": "http://127.0.0.1:46481/onvif/MediaAlternate",
+     "version": {
+      "major": 2,
+      "minor": 6
+     },
+     "missing_fields": [],
+     "invalid_fields": []
+    },
+    {
+     "namespace": "http://www.onvif.org/ver20/imaging/wsdl",
+     "xaddr": "http://127.0.0.1:46481/onvif/Imaging",
+     "version": {
+      "major": 2,
+      "minor": 6
+     },
+     "missing_fields": [],
+     "invalid_fields": []
+    },
+    {
+     "namespace": "http://www.onvif.org/ver10/events/wsdl",
+     "xaddr": "http://127.0.0.1:46481/onvif/Events",
+     "version": {
+      "major": 2,
+      "minor": 6
+     },
+     "missing_fields": [],
+     "invalid_fields": []
+    },
+    {
+     "namespace": "http://www.onvif.org/ver10/recording/wsdl",
+     "xaddr": "http://127.0.0.1:46481/onvif/Recording",
+     "version": {
+      "major": 2,
+      "minor": 6
+     },
+     "missing_fields": [],
+     "invalid_fields": []
+    },
+    {
+     "namespace": "http://www.onvif.org/ver10/search/wsdl",
+     "xaddr": "http://127.0.0.1:46481/onvif/Search",
      "version": {
       "major": 2,
       "minor": 6
@@ -158,7 +194,7 @@
      "ptz_config": true,
      "media_gen": 1,
      "stream_uri": "rtsp://onvif_user:***@127.0.0.1:554/stream1",
-     "snapshot_uri": "http://127.0.0.1:39253/snap.jpg",
+     "snapshot_uri": "http://127.0.0.1:46481/snap.jpg",
      "encoder_options": {
       "status": "ok",
       "reason": null,
@@ -306,7 +342,7 @@
      "ptz_config": false,
      "media_gen": 1,
      "stream_uri": "rtsp://onvif_user:***@127.0.0.1:554/stream1",
-     "snapshot_uri": "http://127.0.0.1:39253/snap.jpg",
+     "snapshot_uri": "http://127.0.0.1:46481/snap.jpg",
      "encoder_options": {
       "status": "ok",
       "reason": null,
@@ -433,6 +469,163 @@
    ],
    "channel_count": 1,
    "channel_count_basis": "video_source",
+   "sources": [
+    {
+     "token": "Sensor_1",
+     "name": "Front",
+     "name_origin": "VideoSource.Name",
+     "framerate": 30.0,
+     "resolution": {
+      "width": 1920,
+      "height": 1080
+     },
+     "bound_to_profile": true,
+     "configuration_tokens": [
+      "VS_1"
+     ]
+    },
+    {
+     "token": "Sensor_2",
+     "name": "Side",
+     "name_origin": "VideoSource.Name",
+     "framerate": 30.0,
+     "resolution": {
+      "width": 1280,
+      "height": 720
+     },
+     "bound_to_profile": false,
+     "configuration_tokens": [
+      "VS_2"
+     ]
+    }
+   ],
+   "sources_status": "ok",
+   "sources_reason": null,
+   "imaging": {
+    "status": "ok",
+    "reason": null,
+    "sources": [
+     {
+      "source_token": "Sensor_1",
+      "settings": {
+       "status": "ok",
+       "reason": null,
+       "data": {
+        "brightness": 50.0,
+        "color_saturation": 60.0,
+        "contrast": 55.0,
+        "sharpness": 40.0,
+        "exposure_mode": "AUTO",
+        "white_balance_mode": "AUTO",
+        "backlight_compensation_mode": "OFF",
+        "wide_dynamic_range_mode": "OFF",
+        "ir_cut_filter": "AUTO",
+        "auto_focus_mode": "AUTO"
+       }
+      },
+      "options": {
+       "status": "ok",
+       "reason": null,
+       "data": {
+        "brightness": {
+         "min": 0.0,
+         "max": 100.0
+        },
+        "color_saturation": {
+         "min": 0.0,
+         "max": 100.0
+        },
+        "contrast": {
+         "min": 0.0,
+         "max": 100.0
+        },
+        "sharpness": {
+         "min": 0.0,
+         "max": 100.0
+        }
+       }
+      }
+     },
+     {
+      "source_token": "Sensor_2",
+      "settings": {
+       "status": "ok",
+       "reason": null,
+       "data": {
+        "brightness": 50.0,
+        "color_saturation": 60.0,
+        "contrast": 55.0,
+        "sharpness": 40.0,
+        "exposure_mode": "AUTO",
+        "white_balance_mode": "AUTO",
+        "backlight_compensation_mode": "OFF",
+        "wide_dynamic_range_mode": "OFF",
+        "ir_cut_filter": "AUTO",
+        "auto_focus_mode": "AUTO"
+       }
+      },
+      "options": {
+       "status": "ok",
+       "reason": null,
+       "data": {
+        "brightness": {
+         "min": 0.0,
+         "max": 100.0
+        },
+        "color_saturation": {
+         "min": 0.0,
+         "max": 100.0
+        },
+        "contrast": {
+         "min": 0.0,
+         "max": 100.0
+        },
+        "sharpness": {
+         "min": 0.0,
+         "max": 100.0
+        }
+       }
+      }
+     }
+    ]
+   },
+   "events": {
+    "status": "ok",
+    "reason": null,
+    "data": {
+     "topic_namespaces": [
+      "http://www.onvif.org/ver10/topics",
+      "http://example.invalid/vendor/topics"
+     ],
+     "fixed_topic_set": false,
+     "topics": [
+      "Device",
+      "VideoAnalytics"
+     ]
+    }
+   },
+   "recording": {
+    "jobs": {
+     "status": "ok",
+     "reason": null,
+     "data": {
+      "job_count": 1,
+      "states": [
+       "Recording"
+      ]
+     }
+    },
+    "summary": {
+     "status": "ok",
+     "reason": null,
+     "data": {
+      "data_from": "2026-01-01T00:00:00Z",
+      "data_until": "2026-01-02T00:00:00Z",
+      "number_recordings": 3,
+      "number_recordings_failed": 1
+     }
+    }
+   },
    "ptz": {
     "present": true,
     "evidence": "capability_xaddr+profile_config",
@@ -504,11 +697,11 @@
   },
   {
    "ip": "127.0.0.1",
-   "port": 38611,
+   "port": 45941,
    "endpoint": null,
    "types": null,
    "xaddrs": [
-    "http://127.0.0.1:38611/onvif/device_service"
+    "http://127.0.0.1:45941/onvif/device_service"
    ],
    "source_ips": [
     "127.0.0.1"
@@ -538,22 +731,26 @@
     "prefix": 8
    },
    "clock": {
-    "device_time": "2026-11-08T00:07:09+00:00",
-    "offset_s": 2.8,
+    "device_time": "2026-11-15T05:50:09+00:00",
+    "offset_s": 2.1,
     "skew": false
    },
    "services": {
-    "device": "http://127.0.0.1:38611/onvif/device_service",
-    "media": "http://127.0.0.1:38611/onvif/Media"
+    "device": "http://127.0.0.1:45941/onvif/device_service",
+    "media": "http://127.0.0.1:45941/onvif/Media",
+    "imaging": "http://127.0.0.1:45941/onvif/Imaging",
+    "events": "http://127.0.0.1:45941/onvif/Events"
    },
    "service_sources": {
     "device": "GetCapabilities",
-    "media": "GetCapabilities"
+    "media": "GetCapabilities",
+    "imaging": "GetServices",
+    "events": "GetServices"
    },
    "services_declared": [
     {
      "namespace": "http://www.onvif.org/ver10/device/wsdl",
-     "xaddr": "http://127.0.0.1:38611/onvif/device_service",
+     "xaddr": "http://127.0.0.1:45941/onvif/device_service",
      "version": {
       "major": null,
       "minor": null
@@ -566,7 +763,33 @@
     },
     {
      "namespace": "http://www.onvif.org/ver10/media/wsdl",
-     "xaddr": "http://127.0.0.1:38611/onvif/Media",
+     "xaddr": "http://127.0.0.1:45941/onvif/Media",
+     "version": {
+      "major": null,
+      "minor": null
+     },
+     "missing_fields": [
+      "version.major",
+      "version.minor"
+     ],
+     "invalid_fields": []
+    },
+    {
+     "namespace": "http://www.onvif.org/ver20/imaging/wsdl",
+     "xaddr": "http://127.0.0.1:45941/onvif/Imaging",
+     "version": {
+      "major": null,
+      "minor": null
+     },
+     "missing_fields": [
+      "version.major",
+      "version.minor"
+     ],
+     "invalid_fields": []
+    },
+    {
+     "namespace": "http://www.onvif.org/ver10/events/wsdl",
+     "xaddr": "http://127.0.0.1:45941/onvif/Events",
      "version": {
       "major": null,
       "minor": null
@@ -597,7 +820,7 @@
      "ptz_config": false,
      "media_gen": 1,
      "stream_uri": "rtsp://127.0.0.1:554/stream1",
-     "snapshot_uri": "http://127.0.0.1:38611/snap.jpg",
+     "snapshot_uri": "http://127.0.0.1:45941/snap.jpg",
      "encoder_options": {
       "status": "ok",
       "reason": null,
@@ -724,6 +947,88 @@
    ],
    "channel_count": 1,
    "channel_count_basis": "profiles",
+   "sources": [
+    {
+     "token": "Sensor_1",
+     "name": "Front",
+     "name_origin": "VideoSource.Name",
+     "framerate": 20.0,
+     "resolution": {
+      "width": 2560,
+      "height": 1440
+     },
+     "bound_to_profile": true,
+     "configuration_tokens": [
+      "VS_1"
+     ]
+    }
+   ],
+   "sources_status": "ok",
+   "sources_reason": null,
+   "imaging": {
+    "status": "ok",
+    "reason": null,
+    "sources": [
+     {
+      "source_token": "Sensor_1",
+      "settings": {
+       "status": "ok",
+       "reason": null,
+       "data": {
+        "brightness": 50.0,
+        "color_saturation": 60.0,
+        "contrast": 55.0,
+        "sharpness": 40.0,
+        "exposure_mode": "AUTO",
+        "white_balance_mode": "AUTO",
+        "backlight_compensation_mode": "OFF",
+        "wide_dynamic_range_mode": "OFF",
+        "ir_cut_filter": "AUTO",
+        "auto_focus_mode": "AUTO"
+       }
+      },
+      "options": {
+       "status": "ok",
+       "reason": null,
+       "data": {
+        "brightness": {
+         "min": 0.0,
+         "max": 100.0
+        },
+        "color_saturation": {
+         "min": 0.0,
+         "max": 100.0
+        },
+        "contrast": {
+         "min": 0.0,
+         "max": 100.0
+        },
+        "sharpness": {
+         "min": 0.0,
+         "max": 100.0
+        }
+       }
+      }
+     }
+    ]
+   },
+   "events": {
+    "status": "unsupported",
+    "reason": "operation not supported",
+    "data": null
+   },
+   "recording": {
+    "jobs": {
+     "status": "unqueried",
+     "reason": "no recording service route",
+     "data": null
+    },
+    "summary": {
+     "status": "unqueried",
+     "reason": "no search service route",
+     "data": null
+    }
+   },
    "ptz": {
     "present": false,
     "evidence": null,
@@ -770,11 +1075,11 @@
   },
   {
    "ip": "127.0.0.1",
-   "port": 41313,
+   "port": 43327,
    "endpoint": null,
    "types": null,
    "xaddrs": [
-    "http://127.0.0.1:41313/onvif/device_service"
+    "http://127.0.0.1:43327/onvif/device_service"
    ],
    "source_ips": [
     "127.0.0.1"
@@ -805,14 +1110,14 @@
     "prefix": 8
    },
    "clock": {
-    "device_time": "2026-11-08T01:09:09+00:00",
-    "offset_s": 3722.8,
+    "device_time": "2026-11-15T06:52:09+00:00",
+    "offset_s": 3722.1,
     "skew": true
    },
    "services": {
-    "device": "http://127.0.0.1:41313/onvif/device_service",
-    "ptz": "http://127.0.0.1:41313/onvif/PTZ",
-    "media2": "http://127.0.0.1:41313/onvif/media2"
+    "device": "http://127.0.0.1:43327/onvif/device_service",
+    "ptz": "http://127.0.0.1:43327/onvif/PTZ",
+    "media2": "http://127.0.0.1:43327/onvif/media2"
    },
    "service_sources": {
     "device": "GetCapabilities",
@@ -822,7 +1127,7 @@
    "services_declared": [
     {
      "namespace": "http://www.onvif.org/ver10/device/wsdl",
-     "xaddr": "http://127.0.0.1:41313/onvif/device_service",
+     "xaddr": "http://127.0.0.1:43327/onvif/device_service",
      "version": {
       "major": 2,
       "minor": 6
@@ -832,7 +1137,7 @@
     },
     {
      "namespace": "http://www.onvif.org/ver20/media/wsdl",
-     "xaddr": "http://127.0.0.1:41313/onvif/media2",
+     "xaddr": "http://127.0.0.1:43327/onvif/media2",
      "version": {
       "major": 2,
       "minor": 6
@@ -842,7 +1147,7 @@
     },
     {
      "namespace": "http://www.onvif.org/ver20/ptz/wsdl",
-     "xaddr": "http://127.0.0.1:41313/onvif/PTZ",
+     "xaddr": "http://127.0.0.1:43327/onvif/PTZ",
      "version": {
       "major": 2,
       "minor": 6
@@ -870,7 +1175,7 @@
      "ptz_config": true,
      "media_gen": 2,
      "stream_uri": "rtsp://127.0.0.1:554/stream1",
-     "snapshot_uri": "http://127.0.0.1:41313/snap.jpg",
+     "snapshot_uri": "http://127.0.0.1:43327/snap.jpg",
      "encoder_options": {
       "status": "ok",
       "reason": null,
@@ -991,7 +1296,7 @@
      "ptz_config": true,
      "media_gen": 2,
      "stream_uri": "rtsp://127.0.0.1:554/stream1",
-     "snapshot_uri": "http://127.0.0.1:41313/snap.jpg",
+     "snapshot_uri": "http://127.0.0.1:43327/snap.jpg",
      "encoder_options": {
       "status": "ok",
       "reason": null,
@@ -1097,6 +1402,54 @@
    ],
    "channel_count": 1,
    "channel_count_basis": "video_source",
+   "sources": [
+    {
+     "token": "Sensor_1",
+     "name": "VS",
+     "name_origin": "VideoSourceConfiguration.Name",
+     "framerate": null,
+     "resolution": null,
+     "bound_to_profile": true,
+     "configuration_tokens": [
+      "VS_1"
+     ]
+    },
+    {
+     "token": "Sensor_2",
+     "name": "VS2",
+     "name_origin": "VideoSourceConfiguration.Name",
+     "framerate": null,
+     "resolution": null,
+     "bound_to_profile": false,
+     "configuration_tokens": [
+      "VS_2"
+     ]
+    }
+   ],
+   "sources_status": "ok",
+   "sources_reason": null,
+   "imaging": {
+    "status": "unqueried",
+    "reason": "no imaging service route",
+    "sources": []
+   },
+   "events": {
+    "status": "unqueried",
+    "reason": "no events service route",
+    "data": null
+   },
+   "recording": {
+    "jobs": {
+     "status": "unqueried",
+     "reason": "no recording service route",
+     "data": null
+    },
+    "summary": {
+     "status": "unqueried",
+     "reason": "no search service route",
+     "data": null
+    }
+   },
    "ptz": {
     "present": true,
     "evidence": "capability_xaddr+profile_config",
@@ -1134,12 +1487,17 @@
     {
      "code": "CLOCK_SKEW",
      "severity": "warn",
-     "detail": "device clock offset 3723s; check NTP on the device"
+     "detail": "device clock offset 3722s; check NTP on the device"
     },
     {
      "code": "MEDIA2_ONLY",
      "severity": "info",
      "detail": "profiles only via Media2 (Profile T generation)"
+    },
+    {
+     "code": "RESPONSE_MALFORMED",
+     "severity": "warn",
+     "detail": "at least one SOAP response needed loose parsing (non-conformant XML)"
     }
    ],
    "next_steps": [
