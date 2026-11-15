@@ -32,6 +32,7 @@ PERSONAS = {
         port=18081, disc_port=37021, manufacturer="Acme (sim)", model="ViewCam AC-200",
         firmware="1.4.2 (sim)", serial="SIMSTD0001", hardware="AC-200",
         clock_offset_s=2, auth_devinfo=True, auth_caps=False, ptz=True, media2=False,
+        imaging=True, events=True, recording=True,
         stream_uri_with_creds=True, dual_stack=True,
         scopes="onvif://www.onvif.org/Profile/Streaming onvif://www.onvif.org/Profile/T "
                "onvif://www.onvif.org/name/Sim%20Standard onvif://www.onvif.org/hardware/AC-200 "
@@ -49,6 +50,7 @@ PERSONAS = {
         port=18082, disc_port=37022, manufacturer="OldBrand (sim)", model="OC-10",
         firmware="0.9.8 (sim)", serial="SIMLEG0002", hardware="OC-10",
         clock_offset_s=3, auth_devinfo=False, auth_caps=False, ptz=False, media2=False,
+        imaging=True, events=True, events_fault=True, recording=False,
         stream_uri_with_creds=False, source_tokens=False,
         scopes="onvif://www.onvif.org/Profile/Streaming",
         profiles=[("Profile_1", "H264", 2560, 1440, 20, False)],
@@ -60,6 +62,7 @@ PERSONAS = {
         port=18083, disc_port=37023, manufacturer="SecureEye (sim)", model="SE-9",
         firmware="7.1.0 (sim)", serial="SIMSTR0003", hardware="SE-9",
         clock_offset_s=3723, auth_devinfo=True, auth_caps=True, ptz=True, media2=True,
+        imaging=False, events=False, recording=False,
         stream_uri_with_creds=False,
         scopes="onvif://www.onvif.org/Profile/Streaming onvif://www.onvif.org/Profile/T "
                "onvif://www.onvif.org/name/Sim%20Strict onvif://www.onvif.org/hardware/SE-9 "
@@ -171,6 +174,74 @@ def video_source_configurations_response(p, media2=False):
                     '</m:GetVideoSourceConfigurationsResponse>' % (ns, TT, items))
 
 
+IMAGING_NS = "http://www.onvif.org/ver20/imaging/wsdl"
+EVENTS_NS = "http://www.onvif.org/ver10/events/wsdl"
+RECORDING_NS = "http://www.onvif.org/ver10/recording/wsdl"
+SEARCH_NS = "http://www.onvif.org/ver10/search/wsdl"
+
+
+def imaging_settings_response(p):
+    return envelope(
+        '<timg:GetImagingSettingsResponse xmlns:timg="%s" xmlns:tt="%s">'
+        '<timg:ImagingSettings><tt:Brightness>50</tt:Brightness>'
+        '<tt:ColorSaturation>60</tt:ColorSaturation><tt:Contrast>55</tt:Contrast>'
+        '<tt:Sharpness>40</tt:Sharpness>'
+        '<tt:Exposure><tt:Mode>AUTO</tt:Mode></tt:Exposure>'
+        '<tt:Focus><tt:AutoFocusMode>AUTO</tt:AutoFocusMode></tt:Focus>'
+        '<tt:IrCutFilter>AUTO</tt:IrCutFilter>'
+        '<tt:WhiteBalance><tt:Mode>AUTO</tt:Mode></tt:WhiteBalance>'
+        '<tt:WideDynamicRange><tt:Mode>OFF</tt:Mode></tt:WideDynamicRange>'
+        '<tt:BacklightCompensation><tt:Mode>OFF</tt:Mode></tt:BacklightCompensation>'
+        '</timg:ImagingSettings></timg:GetImagingSettingsResponse>' % (IMAGING_NS, TT))
+
+
+def imaging_options_response(p):
+    ranges = "".join('<tt:%s><tt:Min>0</tt:Min><tt:Max>100</tt:Max></tt:%s>'
+                     % (name, name) for name in
+                     ("Brightness", "ColorSaturation", "Contrast", "Sharpness"))
+    return envelope(
+        '<timg:GetOptionsResponse xmlns:timg="%s" xmlns:tt="%s"><timg:Options>%s'
+        '<tt:IrCutFilterModes>AUTO</tt:IrCutFilterModes>'
+        '<tt:IrCutFilterModes>ON</tt:IrCutFilterModes>'
+        '</timg:Options></timg:GetOptionsResponse>' % (IMAGING_NS, TT, ranges))
+
+
+def event_properties_response(p):
+    return envelope(
+        '<tev:GetEventPropertiesResponse xmlns:tev="%s" '
+        'xmlns:tnsc1="http://www.onvif.org/ver10/topics">'
+        '<tev:TopicNamespaceLocation>http://www.onvif.org/ver10/topics'
+        '</tev:TopicNamespaceLocation>'
+        '<tev:TopicNamespaceLocation>http://example.invalid/vendor/topics'
+        '</tev:TopicNamespaceLocation>'
+        '<tev:FixedTopicSet>false</tev:FixedTopicSet>'
+        '<tev:TopicSet><tnsc1:VideoAnalytics><tnsc1:MotionDetection/>'
+        '</tnsc1:VideoAnalytics><tnsc1:Device><tnsc1:Trigger/></tnsc1:Device>'
+        '</tev:TopicSet></tev:GetEventPropertiesResponse>' % EVENTS_NS)
+
+
+def recording_jobs_response(p):
+    # The job carries schedule/recording tokens on purpose: the scanner's
+    # parser must never extract them into the inventory (T5).
+    return envelope(
+        '<trc:GetRecordingJobsResponse xmlns:trc="%s" xmlns:tt="%s">'
+        '<trc:JobItem><tt:JobConfiguration><tt:ScheduleToken>SCHED_1</tt:ScheduleToken>'
+        '<tt:RecordingToken>REC_1</tt:RecordingToken><tt:Mode>Active</tt:Mode>'
+        '<tt:Priority>5</tt:Priority></tt:JobConfiguration>'
+        '<tt:JobStateInformation><tt:State>Recording</tt:State></tt:JobStateInformation>'
+        '</trc:JobItem></trc:GetRecordingJobsResponse>' % (RECORDING_NS, TT))
+
+
+def recording_summary_response(p):
+    return envelope(
+        '<tse:GetRecordingSummaryResponse xmlns:tse="%s" xmlns:tt="%s">'
+        '<tse:Summary><tt:DataFrom>2026-01-01T00:00:00Z</tt:DataFrom>'
+        '<tt:DataUntil>2026-01-02T00:00:00Z</tt:DataUntil>'
+        '<tt:NumberRecordings>3</tt:NumberRecordings>'
+        '<tt:NumberRecordingsFailed>1</tt:NumberRecordingsFailed></tse:Summary>'
+        '</tse:GetRecordingSummaryResponse>' % (SEARCH_NS, TT))
+
+
 def ptz_node_xml(token="PTZNode", capacity=80, home=True, tours=2):
     extension = ('' if tours is None else '<tt:Extension><tt:SupportedPresetTour>'
                  '<tt:MaximumNumberOfPresetTours>%d</tt:MaximumNumberOfPresetTours>'
@@ -233,9 +304,15 @@ def handle_soap(p, path, raw):
             declarations.append(("http://www.onvif.org/ver20/ptz/wsdl", "/onvif/PTZ"))
         if not p["media2"] and p["ptz"]:
             declarations.extend([
-                ("http://www.onvif.org/ver10/events/wsdl", "/onvif/Events"),
                 ("urn:fictional:sim:extra", "/onvif/Extra"),
                 (media_ns, "/onvif/MediaAlternate")])
+        if p.get("imaging"):
+            declarations.append(("http://www.onvif.org/ver20/imaging/wsdl", "/onvif/Imaging"))
+        if p.get("events"):
+            declarations.append(("http://www.onvif.org/ver10/events/wsdl", "/onvif/Events"))
+        if p.get("recording"):
+            declarations.append(("http://www.onvif.org/ver10/recording/wsdl", "/onvif/Recording"))
+            declarations.append(("http://www.onvif.org/ver10/search/wsdl", "/onvif/Search"))
         version = ("<tds:Version><tt:Major>2</tt:Major><tt:Minor>6</tt:Minor>"
                    "</tds:Version>") if p["ptz"] else ""
         services = "".join(
@@ -334,6 +411,48 @@ def handle_soap(p, path, raw):
         if not check_auth(p, root):
             return 401, fault()
         return 200, encoder_options_response(p["media2"])
+    if op in ("GetImagingSettings", "GetOptions"):
+        request = list(body)[0]
+        children = list(request)
+        if (operation != "{%s}%s" % (IMAGING_NS, op) or path != "/onvif/Imaging"
+                or len(children) != 1
+                or children[0].tag != "{%s}VideoSourceToken" % IMAGING_NS):
+            return 400, fault("invalid imaging request", "InvalidArgVal")
+        if not p.get("imaging"):
+            return 400, fault("imaging unsupported", "ActionNotSupported")
+        if not check_auth(p, root):
+            return 401, fault()
+        if children[0].text not in [s["token"] for s in p.get("video_sources", [])]:
+            return 400, fault("unknown video source", "InvalidArgVal")
+        if op == "GetImagingSettings":
+            return 200, imaging_settings_response(p)
+        return 200, imaging_options_response(p)
+    if op == "GetEventProperties":
+        request = list(body)[0]
+        if (operation != "{%s}GetEventProperties" % EVENTS_NS or path != "/onvif/Events"
+                or list(request)):
+            return 400, fault("invalid event properties request", "InvalidArgVal")
+        if not check_auth(p, root):
+            return 401, fault()
+        if p.get("events_fault"):
+            return 400, fault("event properties unsupported", "ActionNotSupported")
+        return 200, event_properties_response(p)
+    if op == "GetRecordingJobs":
+        request = list(body)[0]
+        if (operation != "{%s}GetRecordingJobs" % RECORDING_NS
+                or path != "/onvif/Recording" or list(request)):
+            return 400, fault("invalid recording jobs request", "InvalidArgVal")
+        if not check_auth(p, root):
+            return 401, fault()
+        return 200, recording_jobs_response(p)
+    if op == "GetRecordingSummary":
+        request = list(body)[0]
+        if (operation != "{%s}GetRecordingSummary" % SEARCH_NS
+                or path != "/onvif/Search" or list(request)):
+            return 400, fault("invalid recording summary request", "InvalidArgVal")
+        if not check_auth(p, root):
+            return 401, fault()
+        return 200, recording_summary_response(p)
     if "GetProfiles" in text:
         if not check_auth(p, root):
             return 401, fault()

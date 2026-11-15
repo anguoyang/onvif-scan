@@ -158,7 +158,7 @@ class TestScanHTTP(unittest.TestCase):
         calls = [c for c in p["calls"] if c["operation"] == "GetServices"]
         self.assertEqual(len(calls), 1)
         self.assertTrue(calls[0]["credentialed"])
-        self.assertEqual(len(rec["services_declared"]), 6)
+        self.assertEqual(len(rec["services_declared"]), 9)
         self.assertIn("urn:fictional:sim:extra", [s["namespace"] for s in rec["services_declared"]])
         self.assertTrue(rec["services"]["media"].endswith("/onvif/Media"))
         self.assertIn("events", rec["services"])
@@ -218,7 +218,7 @@ class TestScanHTTP(unittest.TestCase):
                 self.assertEqual(sum(c["operation"] == "GetServices" for c in p["calls"]), 1)
                 self.assertFalse(any(c["credentialed"] for c in p["calls"]))
                 if allowed:
-                    self.assertEqual(len(rec["services_declared"]), 2)
+                    self.assertEqual(len(rec["services_declared"]), 4)
                 else:
                     self.assertIsNone(rec["services_declared"])
 
@@ -285,7 +285,7 @@ class TestScanHTTP(unittest.TestCase):
             self.assertEqual(lines[1], "reports: %s + %s" % (json_path, html_path))
             saved = json_path.read_text()
             device = json.loads(saved)["devices"][0]
-            self.assertEqual(len(device["services_declared"]), 6)
+            self.assertEqual(len(device["services_declared"]), 9)
             html = html_path.read_text()
             self.assertIn("urn:fictional:sim:extra", html)
             self.assertIn("Selected route sources:", html)

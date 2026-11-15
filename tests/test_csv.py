@@ -35,7 +35,8 @@ class TestCSV(unittest.TestCase):
                          'ip,port,mac,manufacturer,model,firmware_version,hostname,level,'
                          'profile_token,profile_name,media_gen,video_source_token,'
                          'encoder_options_status,ptz_node_token,preset_count,channel_count,'
-                         'clock_offset_s,findings,source_count,unbound_source_count')
+                         'clock_offset_s,findings,source_count,unbound_source_count,'
+                         'event_topic_count,recording_count')
 
     def test_no_profile_still_has_one_row_and_empty_profile_cells(self):
         rows = self.export()
